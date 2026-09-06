@@ -1,63 +1,67 @@
-// src/features/whatsapp/PainelFaltas.jsx
 import React from 'react';
 import { api } from '../../services/api';
 import { AlertTriangle, Send } from 'lucide-react';
 
 export function PainelFaltas({ alunosComFaltas }) {
   const handleDispararLoteFaltas = async () => {
-    if (confirm("Deseja iniciar o disparo de mensagens de reposição de faltas para os alunos elegíveis?")) {
+    if (confirm('Deseja iniciar o disparo de mensagens de reposição de faltas para os alunos elegíveis?')) {
       try {
         await api.post('/whatsapp/disparar-reposicoes');
-        alert("Automação de faltas iniciada no backend.");
+        alert('Automação de faltas iniciada no backend.');
       } catch (error) {
-        alert("Erro ao acionar a automação.");
+        alert('Erro ao acionar a automação.');
       }
     }
   };
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-md">
-      <div className="flex justify-between items-center mb-6">
+    <div className="card">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold">Avisos de Faltas e Reposições</h2>
-          <p className="text-sm text-gray-500">
-            Última semana para agendamento de reposição do mês[cite: 1, 2]
+          <h2 className="text-xl font-bold text-navy-900 dark:text-white">Avisos de Faltas e Reposições</h2>
+          <p className="text-sm text-navy-500 dark:text-navy-300">
+            Última semana para agendamento de reposição do mês
           </p>
         </div>
         <button
           onClick={handleDispararLoteFaltas}
-          className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-navy-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-navy-900 dark:bg-navy-500 dark:hover:bg-navy-400"
         >
           <Send size={16} />
-          Disparar Lembretes de Reposição[cite: 1, 2]
+          Disparar Lembretes de Reposição
         </button>
       </div>
 
-      <table className="w-full text-left border-collapse">
-        <thead>
-          <tr className="border-b bg-gray-50">
-            <th className="p-3 text-sm font-semibold">Aluno</th>
-            <th className="p-3 text-sm font-semibold">Turno</th>
-            <th className="p-3 text-sm font-semibold">Faltas</th>
-            <th className="p-3 text-sm font-semibold">Contato Preferencial</th>
-          </tr>
-        </thead>
-        <tbody>
-          {alunosComFaltas.map((aluno) => (
-            <tr key={aluno.id} className="border-b hover:bg-gray-50">
-              <td className="p-3 font-medium">{aluno.nome}</td>
-              <td className="p-3">{aluno.turno}</td>
-              <td className="p-3 text-red-600 font-bold flex items-center gap-1">
-                <AlertTriangle size={14} />
-                {aluno.faltas} falta(s)[cite: 1, 2]
-              </td>
-              <td className="p-3 text-sm text-gray-600">
-                {aluno.telefone_pessoal || aluno.telefone_comercial || 'Sem número'}[cite: 1, 2]
-              </td>
+      <div className="overflow-x-auto rounded-xl border border-navy-100 dark:border-navy-700">
+        <table className="w-full min-w-[540px] text-left">
+          <thead>
+            <tr className="border-b border-navy-100 bg-navy-50 dark:border-navy-700 dark:bg-navy-800/70">
+              <th className="p-3 text-sm font-semibold text-navy-800 dark:text-navy-100">Aluno</th>
+              <th className="p-3 text-sm font-semibold text-navy-800 dark:text-navy-100">Turno</th>
+              <th className="p-3 text-sm font-semibold text-navy-800 dark:text-navy-100">Faltas</th>
+              <th className="p-3 text-sm font-semibold text-navy-800 dark:text-navy-100">Contato Preferencial</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {alunosComFaltas.map((aluno) => (
+              <tr
+                key={aluno.id}
+                className="border-b border-navy-100 last:border-0 hover:bg-navy-50 dark:border-navy-800 dark:hover:bg-navy-800/40"
+              >
+                <td className="p-3 font-medium text-navy-900 dark:text-navy-50">{aluno.nome}</td>
+                <td className="p-3 text-navy-700 dark:text-navy-200">{aluno.turno}</td>
+                <td className="p-3 flex items-center gap-1 font-bold text-red-600 dark:text-red-400">
+                  <AlertTriangle size={14} />
+                  {aluno.faltas} falta(s)
+                </td>
+                <td className="p-3 text-sm text-navy-600 dark:text-navy-300">
+                  {aluno.telefone_pessoal || aluno.telefone_comercial || 'Sem número'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

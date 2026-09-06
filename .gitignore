@@ -1,0 +1,17 @@
+# Python / FastAPI
+__pycache__/
+*.pyc
+.env
+venv/
+
+# Node / React
+node_modules/
+dist/
+.env.local
+
+# Banco de dados local
+*.sqlite3
+
+# IDEs
+.vscode/
+.idea/

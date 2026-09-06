@@ -8,7 +8,7 @@ class Aluno(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(150), nullable=False, index=True)
-    turno = Column(Enum('MATUTINO', 'VESPERTINO', 'NOTURNO', 'INTEGRAL'), nullable=False)
+    turno = Column(Enum('MATUTINO', 'VESPERTINO', 'NOTURNO', 'INTEGRAL', name='turno_enum'), nullable=False)
     telefone_pessoal = Column(String(20), nullable=True)
     telefone_comercial = Column(String(20), nullable=True)
     historico_observacoes = Column(Text, nullable=True)
@@ -57,13 +57,14 @@ class HistoricoWhatsApp(Base):
     id = Column(Integer, primary_key=True)
     aluno_id = Column(Integer, ForeignKey("alunos.id"), nullable=False)
     numero_destino = Column(String(20), nullable=False)
-    canal_utilizado = Column(Enum('PESSOAL', 'COMERCIAL'), nullable=False)
+    canal_utilizado = Column(Enum('PESSOAL', 'COMERCIAL', name='canal_enum'), nullable=False)
     usou_fallback = Column(Boolean, default=False)
     conteudo = Column(Text, nullable=False)
-    status_final = Column(Enum('PENDENTE', 'SUCESSO', 'FALHA_AMBOS'), default='PENDENTE')
+    status_final = Column(Enum('PENDENTE', 'SUCESSO', 'FALHA_AMBOS', name='status_final_enum'), default='PENDENTE')
     enviado_em = Column(DateTime, default=datetime.utcnow)
 
     aluno = relationship("Aluno", back_populates="mensagens")
+
 
 class Usuario(Base):
     __tablename__ = "usuarios"
@@ -73,7 +74,7 @@ class Usuario(Base):
     email = Column(String(150), unique=True, index=True, nullable=False)
     senha_hash = Column(String(255), nullable=False)
     cargo = Column(
-        Enum('DIRETOR', 'PROFESSOR', 'ASSISTENTE', 'ANALISTA', 'ADM'),
+        Enum('DIRETOR', 'PROFESSOR', 'ASSISTENTE', 'ANALISTA', 'ADM', name='cargo_enum'),
         nullable=False,
         default='ASSISTENTE'
     )
