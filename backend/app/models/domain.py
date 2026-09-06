@@ -66,6 +66,14 @@ class HistoricoWhatsApp(Base):
     aluno = relationship("Aluno", back_populates="mensagens")
 
 
+class ConfiguracaoMensagem(Base):
+    __tablename__ = "configuracoes_mensagem"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template = Column(Text, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Usuario(Base):
     __tablename__ = "usuarios"
 

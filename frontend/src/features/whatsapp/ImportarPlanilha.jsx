@@ -1,172 +1,226 @@
 import React, { useState } from 'react';
 import { api } from '../../services/api';
-import { Upload, FileSpreadsheet, Send, AlertCircle, Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import {
+  Upload,
+  FileSpreadsheet,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  WifiOff,
+  Users,
+  PhoneOff,
+} from 'lucide-react';
+import { statusWhatsappConectado } from './statusWhatsapp';
 
-export function ImportarPlanilha() {
+export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
   const [arquivo, setArquivo] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [carregandoPreview, setCarregandoPreview] = useState(false);
   const [carregando, setCarregando] = useState(false);
-  const [dadosPreview, setDadosPreview] = useState(null);
+  const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState('');
-  const [processandoEnvio, setProcessandoEnvio] = useState(false);
 
-  // 1. Faz a leitura da planilha e gera o Preview visual
-  const handleGerarPreview = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const limparEstadoArquivo = () => {
+    setArquivo(null);
+    setPreview(null);
+    setResultado(null);
+  };
 
-    setArquivo(file);
-    setCarregando(true);
+  const carregarPreview = async (file) => {
+    setCarregandoPreview(true);
     setErro('');
-    setDadosPreview(null);
-
-    const formData = new FormData();
-    formData.append('file', file);
+    setPreview(null);
+    setResultado(null);
 
     try {
+      const formData = new FormData();
+      formData.append('file', file);
+
       const response = await api.post('/whatsapp/preview-planilha', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setDadosPreview(response.data);
+      setPreview(response.data);
     } catch (err) {
-      setErro(err.response?.data?.detail || 'Erro ao carregar a pré-visualização.');
+      setErro(err.response?.data?.detail || 'Erro ao ler a planilha para pré-visualização.');
+      setArquivo(null);
+    } finally {
+      setCarregandoPreview(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    if (!whatsappConectado) {
+      setErro('Conecte o WhatsApp antes de selecionar uma planilha.');
+      e.target.value = '';
+      return;
+    }
+
+    const file = e.target.files[0];
+    if (file) {
+      setArquivo(file);
+      setErro('');
+      setResultado(null);
+      carregarPreview(file);
+    }
+  };
+
+  const handleEnviar = async () => {
+    if (!whatsappConectado) {
+      setErro('Você precisa conectar o WhatsApp antes de iniciar os disparos.');
+      return;
+    }
+
+    if (!arquivo) {
+      setErro('Selecione uma planilha .xlsx ou .xls primeiro.');
+      return;
+    }
+
+    setCarregando(true);
+    setErro('');
+    setResultado(null);
+
+    try {
+      const status = await api.get('/whatsapp/status');
+      if (!statusWhatsappConectado(status.data)) {
+        setErro('WhatsApp desconectado. Conecte o aparelho pelo QR Code antes de disparar mensagens.');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', arquivo);
+
+      const response = await api.post('/whatsapp/upload-planilha', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setResultado(response.data);
+    } catch (err) {
+      setErro(err.response?.data?.detail || 'Erro ao processar a planilha.');
     } finally {
       setCarregando(false);
     }
   };
 
-  // 2. Simula/Executa o envio acompanhando linha por linha
-  const handleIniciarDisparos = async () => {
-    if (!dadosPreview?.registros) return;
-
-    setProcessandoEnvio(true);
-    const listaAtualizada = [...dadosPreview.registros];
-
-    for (let i = 0; i < listaAtualizada.length; i++) {
-      if (listaAtualizada[i].status === 'SEM_TELEFONE') continue;
-
-      // Atualiza status para PROCESSANDO
-      listaAtualizada[i].status = 'PROCESSANDO';
-      setDadosPreview({ ...dadosPreview, registros: [...listaAtualizada] });
-
-      // Simulação de tempo de envio (Substituir por chamada real da API)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Atualiza status para SUCESSO
-      listaAtualizada[i].status = 'ENVIADO';
-      setDadosPreview({ ...dadosPreview, registros: [...listaAtualizada] });
-    }
-
-    setProcessandoEnvio(false);
-  };
-
   return (
-    <div className="p-6 bg-white rounded-lg shadow-md max-w-5xl mx-auto mt-6">
-      <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-2">
-        <FileSpreadsheet className="text-green-600" />
-        Importar e Disparar Mensagens (WhatsApp)
+    <div className="card mx-auto max-w-3xl notranslate">
+      <h2 className="mb-2 flex items-center gap-2 text-xl font-bold text-navy-900 dark:text-white">
+        <FileSpreadsheet className="text-navy-600 dark:text-navy-300" />
+        Importar Planilha e Disparar
       </h2>
-      <p className="text-sm text-gray-500 mb-6">
-        Selecione a planilha para visualizar as mensagens e acompanhar o status do envio de cada aluno em tempo real.
+      <p className="mb-6 text-sm text-navy-500 dark:text-navy-300">
+        Selecione a planilha para conferir uma prévia de quem vai receber mensagem antes de disparar.
       </p>
 
-      {/* Caixa de Upload */}
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative mb-6">
+      {!whatsappConectado ? (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+          <WifiOff size={20} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <span>
+            <strong>WhatsApp desconectado.</strong> Conecte o aparelho pelo QR Code para liberar o envio da planilha.{' '}
+            {onIrParaConexao ? (
+              <button
+                type="button"
+                onClick={onIrParaConexao}
+                className="font-semibold underline"
+              >
+                Ir para Conectar WhatsApp
+              </button>
+            ) : null}
+          </span>
+        </div>
+      ) : null}
+
+      <div
+        className={`relative rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
+          whatsappConectado
+            ? 'cursor-pointer border-navy-200 bg-navy-50 hover:bg-navy-100/70 dark:border-navy-600 dark:bg-navy-800/50'
+            : 'cursor-not-allowed border-navy-200 bg-navy-50/60 opacity-60 dark:border-navy-700 dark:bg-navy-950/40'
+        }`}
+      >
         <input
           type="file"
           accept=".xlsx, .xls"
-          onChange={handleGerarPreview}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          onChange={handleFileChange}
+          disabled={!whatsappConectado || carregandoPreview}
+          className="absolute inset-0 h-full w-full opacity-0 disabled:cursor-not-allowed"
         />
-        <Upload className="mx-auto h-10 w-10 text-gray-400 mb-2" />
-        <p className="text-sm font-medium text-gray-700">
-          {arquivo ? arquivo.name : 'Clique para selecionar ou arraste sua planilha Excel (.xlsx, .xls)'}
+        <Upload className="mx-auto mb-3 h-12 w-12 text-navy-400" />
+        <p className="text-sm font-medium text-navy-800 dark:text-navy-100">
+          {arquivo ? arquivo.name : 'Clique para selecionar ou arraste sua planilha aqui'}
         </p>
+        <p className="mt-1 text-xs text-navy-400">Suporta arquivos Excel (.xlsx, .xls)</p>
       </div>
 
-      {carregando && (
-        <div className="flex items-center justify-center gap-2 text-blue-600 my-4 font-medium">
-          <Loader2 className="animate-spin" size={20} />
-          Lendo planilha e extraindo contatos...
-        </div>
-      )}
-
-      {erro && (
-        <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm flex items-center gap-2 mb-4">
+      {erro ? (
+        <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400">
           <AlertCircle size={16} />
-          {erro}
+          <span>{erro}</span>
         </div>
-      )}
+      ) : null}
 
-      {/* Tabela de Pré-Visualização e Status */}
-      {dadosPreview && (
+      {carregandoPreview ? (
+        <div className="mt-4 flex items-center gap-2 text-sm text-navy-500 dark:text-navy-300">
+          <Loader2 className="animate-spin" size={16} />
+          <span>Lendo a planilha para pré-visualização...</span>
+        </div>
+      ) : null}
+
+      {preview ? (
         <div className="mt-6">
-          <div className="flex justify-between items-center mb-4 bg-slate-50 p-3 rounded-md border">
-            <span className="text-sm font-semibold text-gray-700">
-              Registros Encontrados: <strong className="text-blue-600">{dadosPreview.total_identificados}</strong>
+          <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-navy-100 px-2.5 py-1 font-medium text-navy-700 dark:bg-navy-800 dark:text-navy-200">
+              <Users size={14} />
+              {preview.total_linhas} aluno(s) com falta
             </span>
-            <button
-              onClick={handleIniciarDisparos}
-              disabled={processandoEnvio}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-md text-sm transition-colors"
-            >
-              {processandoEnvio ? (
-                <>
-                  <Loader2 className="animate-spin" size={16} />
-                  Disparando Mensagens...
-                </>
-              ) : (
-                <>
-                  <Send size={16} />
-                  Confirmar e Iniciar Disparos
-                </>
-              )}
-            </button>
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 px-2.5 py-1 font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <CheckCircle size={14} />
+              {preview.total_validos} receberão mensagem
+            </span>
+            {preview.total_invalidos > 0 ? (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-100 px-2.5 py-1 font-medium text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                <PhoneOff size={14} />
+                {preview.total_invalidos} sem telefone válido
+              </span>
+            ) : null}
           </div>
 
-          <div className="overflow-x-auto border rounded-lg">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="bg-slate-100 border-b text-gray-700">
-                  <th className="p-3">Aluno</th>
-                  <th className="p-3">Telefone</th>
-                  <th className="p-3">Turno / Faltas</th>
-                  <th className="p-3">Mensagem a Enviar</th>
-                  <th className="p-3 text-center">Status</th>
+          <div className="max-h-80 overflow-auto rounded-xl border border-navy-200 dark:border-navy-700">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 bg-navy-100 text-navy-700 dark:bg-navy-800 dark:text-navy-200">
+                <tr>
+                  <th className="px-3 py-2 font-semibold">Aluno</th>
+                  <th className="px-3 py-2 font-semibold">Faltas</th>
+                  <th className="px-3 py-2 font-semibold">Telefone que será usado</th>
+                  <th className="px-3 py-2 font-semibold">Canal</th>
+                  <th className="px-3 py-2 font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody>
-                {dadosPreview.registros.map((item) => (
-                  <tr key={item.id} className="border-b hover:bg-slate-50">
-                    <td className="p-3 font-medium text-gray-900">{item.nome}</td>
-                    <td className="p-3 text-gray-600 font-mono">{item.telefone || 'Sem Número'}</td>
-                    <td className="p-3">
-                      <span className="text-xs bg-gray-200 px-2 py-1 rounded text-gray-700 mr-1">{item.turno}</span>
-                      {item.faltas > 0 && (
-                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold">
-                          {item.faltas} falta(s)
+              <tbody className="divide-y divide-navy-100 dark:divide-navy-800">
+                {preview.candidatos.map((candidato, index) => (
+                  <tr key={`${candidato.nome}-${index}`} className={candidato.valido ? '' : 'opacity-60'}>
+                    <td className="px-3 py-2 text-navy-900 dark:text-navy-100">{candidato.nome}</td>
+                    <td className="px-3 py-2 text-navy-700 dark:text-navy-300">{candidato.faltas}</td>
+                    <td className="px-3 py-2 text-navy-700 dark:text-navy-300">
+                      {candidato.numero || '—'}
+                    </td>
+                    <td className="px-3 py-2 text-navy-700 dark:text-navy-300">
+                      {candidato.canal ? (
+                        <span className="inline-flex items-center gap-1">
+                          {candidato.canal === 'PESSOAL' ? 'Pessoal' : 'Comercial'}
+                          {candidato.usou_fallback ? (
+                            <span className="text-xs text-amber-600 dark:text-amber-400">(fallback)</span>
+                          ) : null}
                         </span>
+                      ) : (
+                        '—'
                       )}
                     </td>
-                    <td className="p-3 text-xs text-gray-600 max-w-xs truncate">{item.mensagem}</td>
-                    <td className="p-3 text-center">
-                      {item.status === 'PENDENTE' && (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold bg-amber-100 text-amber-800 px-2 py-1 rounded-full">
-                          <Clock size={12} /> Pendente
+                    <td className="px-3 py-2">
+                      {candidato.valido ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle size={14} /> Pronto
                         </span>
-                      )}
-                      {item.status === 'PROCESSANDO' && (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-1 rounded-full animate-pulse">
-                          <Loader2 size={12} className="animate-spin" /> Enviando...
-                        </span>
-                      )}
-                      {item.status === 'ENVIADO' && (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                          <CheckCircle2 size={12} /> Enviado
-                        </span>
-                      )}
-                      {item.status === 'SEM_TELEFONE' && (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-1 rounded-full">
-                          <XCircle size={12} /> Sem Número
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400">
+                          <PhoneOff size={14} /> {candidato.motivo_invalido}
                         </span>
                       )}
                     </td>
@@ -176,7 +230,46 @@ export function ImportarPlanilha() {
             </table>
           </div>
         </div>
-      )}
+      ) : null}
+
+      {resultado ? (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+          <div className="mb-1 flex items-center gap-2 font-bold">
+            <CheckCircle size={18} className="text-emerald-600" />
+            <span>{resultado.mensagem}</span>
+          </div>
+          <p className="text-xs text-emerald-700 dark:text-emerald-400">
+            Arquivo: <strong>{resultado.nome_arquivo}</strong> | Mensagens disparadas:{' '}
+            <strong>{resultado.total_registros_identificados}</strong>
+          </p>
+        </div>
+      ) : null}
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={handleEnviar}
+          disabled={!preview || preview.total_validos === 0 || carregando || carregandoPreview || !whatsappConectado}
+          className="btn-primary"
+        >
+          {carregando ? (
+            <>
+              <Loader2 className="animate-spin" size={18} />
+              <span>Processando Planilha...</span>
+            </>
+          ) : (
+            <span>
+              {preview ? `Confirmar e Disparar (${preview.total_validos})` : 'Iniciar Disparos Automáticos'}
+            </span>
+          )}
+        </button>
+
+        {arquivo && !carregando ? (
+          <button type="button" onClick={limparEstadoArquivo} className="text-sm text-navy-500 underline dark:text-navy-300">
+            Escolher outra planilha
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
