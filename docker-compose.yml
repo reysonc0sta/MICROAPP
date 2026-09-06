@@ -12,6 +12,29 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  evolution_api:
+    image: evoapicloud/evolution-api:v2.3.7
+    container_name: microapp_evolution
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_URL=http://localhost:8080
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=42d713280036
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://postgres:root@db:5432/evolution_db?schema=public
+      - DATABASE_CONNECTION_CLIENT_NAME=microapp_evolution
+      - CACHE_REDIS_ENABLED=false
+      - CONFIG_SESSION_PHONE_CLIENT=Chrome
+      - CONFIG_SESSION_PHONE_NAME=Chrome
+      - QRCODE_LIMIT=30
+    depends_on:
+      - db
+    volumes:
+      - evolution_instances:/evolution/instances
+
   backend:
     build: ./backend
     container_name: microapp_backend
@@ -21,8 +44,11 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:root@db:5432/hub_escola
       - SECRET_KEY=09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7
+      - EVOLUTION_API_URL=http://evolution_api:8080
+      - EVOLUTION_API_KEY=42d713280036
     depends_on:
       - db
+      - evolution_api
 
   frontend:
     build: ./frontend
@@ -32,8 +58,12 @@ services:
       - "5173:5173"
     environment:
       - VITE_API_URL=http://localhost:8000/api/v1
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
 
 volumes:
   postgres_data:
+  evolution_instances:

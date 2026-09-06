@@ -1,66 +1,97 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-import pandas as pd
-import io
-import re
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from sqlalchemy.orm import Session
+import shutil
+import os
+from app.core.database import get_db
+from app.services.config_service import obter_template_mensagem
+from app.services.reposicao_service import (
+    preview_disparos_faltas_excel,
+    processar_disparos_faltas_excel,
+)
+from app.services.whatsapp_service import (
+    conectar_whatsapp,
+    exigir_whatsapp_conectado,
+    obter_estado_conexao,
+    whatsapp_esta_conectado,
+)
 
 router = APIRouter()
 
-def limpar_telefone(numero):
-    if pd.isna(numero):
-        return None
-    num_limpo = re.sub(r'\D', '', str(numero))
-    if not num_limpo:
-        return None
-    if len(num_limpo) in [10, 11]:
-        return "55" + num_limpo
-    return num_limpo
+
+@router.get("/status")
+def status_whatsapp():
+    estado = obter_estado_conexao()
+    conectado = whatsapp_esta_conectado()
+    return {
+        "state": "open" if conectado else estado,
+        "instance": {"state": "open" if conectado else estado},
+        "conectado": conectado,
+    }
+
+
+@router.get("/conectar")
+def conectar(forcar: bool = False):
+    return conectar_whatsapp(forcar_novo=forcar)
+
 
 @router.post("/preview-planilha")
-async def preview_planilha(file: UploadFile = File(...)):
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="Envie um arquivo .xlsx ou .xls")
+async def preview_planilha(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Lê a planilha e devolve a lista de quem receberia mensagem, sem disparar nada."""
+    if not file.filename or not file.filename.endswith((".xls", ".xlsx")):
+        raise HTTPException(status_code=400, detail="Envie um arquivo Excel válido.")
+
+    temp_path = f"temp_preview_{file.filename}"
+    with open(temp_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
 
     try:
-        conteudo = await file.read()
-        df = pd.read_excel(io.BytesIO(conteudo))
-        df = df.dropna(subset=['Nome Aluno'])
+        template = obter_template_mensagem(db)
+        resultado = preview_disparos_faltas_excel(temp_path, template)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
-        # Filtra apenas contratos ativos
-        if 'Status Contrato' in df.columns:
-            df = df[df['Status Contrato'] == 'Ativo']
+    return {
+        "nome_arquivo": file.filename,
+        **resultado,
+    }
 
-        registros = []
-        for idx, row in df.iterrows():
-            nome = str(row.get('Nome Aluno', '')).strip()
-            primeiro_nome = nome.split()[0].title()
-            tel_aluno = limpar_telefone(row.get('Telefone Aluno'))
-            tel_resp = limpar_telefone(row.get('Telefone Responsável'))
-            telefone = tel_aluno or tel_resp
-            turno = str(row.get('Turno', 'Manhã'))
-            faltas = int(row.get('Faltas', 0)) if 'Faltas' in row and not pd.isna(row.get('Faltas')) else 0
 
-            # Gera a mensagem dinâmica dependendo do foco (Faltas ou Lembrete)
-            if faltas > 0:
-                mensagem = f"Olá {primeiro_nome}! Identificamos {faltas} falta(s) este mês. Esta é a ÚLTIMA SEMANA para reposição!"
-            else:
-                mensagem = f"Olá {primeiro_nome}! Lembrando que você tem aula hoje ({turno}). Estamos te esperando!"
+@router.post("/upload-planilha")
+async def upload_planilha(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    exigir_whatsapp_conectado()
+    return _processar_planilha(file, db)
 
-            registros.append({
-                "id": idx + 1,
-                "nome": nome,
-                "primeiro_nome": primeiro_nome,
-                "telefone": telefone,
-                "turno": turno,
-                "faltas": faltas,
-                "mensagem": mensagem,
-                "status": "PENDENTE" if telefone else "SEM_TELEFONE"
-            })
 
-        return {
-            "nome_arquivo": file.filename,
-            "total_identificados": len(registros),
-            "registros": registros
-        }
+@router.post("/disparar-reposicoes")
+async def disparar_reposicoes(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    exigir_whatsapp_conectado()
+    return _processar_planilha(file, db)
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao processar planilha: {str(e)}")
+
+def _processar_planilha(file: UploadFile, db: Session):
+    if not file.filename or not file.filename.endswith((".xls", ".xlsx")):
+        raise HTTPException(status_code=400, detail="Envie um arquivo Excel válido.")
+
+    temp_path = f"temp_{file.filename}"
+    with open(temp_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    try:
+        resultado = processar_disparos_faltas_excel(temp_path, db)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+    return {
+        "mensagem": "Automação de reposição de faltas executada com sucesso!",
+        "nome_arquivo": file.filename,
+        "total_registros_identificados": resultado.get("total_disparados", 0),
+        "dados": resultado,
+    }
