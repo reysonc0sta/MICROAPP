@@ -24,7 +24,7 @@ import { statusWhatsappConectado, lerStatusWhatsapp, gravarStatusWhatsapp, limpa
 
 const NAV_ITEMS = [
   { id: 'conectar', label: 'Conectar WhatsApp', icon: QrCode, admin: false },
-  { id: 'planilha', label: 'Disparar Planilha', icon: FileSpreadsheet, admin: false },
+  { id: 'planilha', label: 'Disparar Faltas', icon: FileSpreadsheet, admin: false },
   { id: 'usuarios', label: 'Gestão de Acessos', icon: UserPlus, admin: true },
   { id: 'lembretes', label: 'Lembretes', icon: Bell, admin: false },
   { id: 'mensagem', label: 'Mensagem', icon: MessageSquareText, admin: false },
