@@ -5,7 +5,8 @@ import { DispararLembretes } from './features/whatsapp/DispararLembretes';
 import { CadastroUsuario } from './features/admin/CadastroUsuario';
 import { ConectarWhatsapp } from './features/whatsapp/ConectarWhatsapp';
 import { EditarMensagem } from './features/configuracoes/EditarMensagem';
-import { FileSpreadsheet, UserPlus, LogOut, Shield, QrCode, Menu, X, MessageSquareText, Bell } from 'lucide-react';
+import { AcompanhamentoModulos } from './features/acompanhamento/AcompanhamentoModulos';
+import { FileSpreadsheet, UserPlus, LogOut, Shield, QrCode, Menu, X, MessageSquareText, Bell, BookOpen } from 'lucide-react';
 import { ThemeToggle } from './components/ThemeToggle';
 import { api } from './services/api';
 import { statusWhatsappConectado } from './features/whatsapp/statusWhatsapp';
@@ -167,6 +168,11 @@ export default function App() {
                 Mensagem
               </button>
 
+              <button type="button" onClick={() => irPara('modulos')} className={classeAba('modulos')}>
+                <BookOpen size={16} />
+                Acompanhamento de Módulos
+              </button>
+
               <button
                 type="button"
                 onClick={handleLogout}
@@ -219,6 +225,11 @@ export default function App() {
               Mensagem
             </button>
 
+            <button type="button" onClick={() => irPara('modulos')} className={`${classeAba('modulos')} w-full`}>
+              <BookOpen size={16} />
+              Acompanhamento de Módulos
+            </button>
+
             <button
               type="button"
               onClick={handleLogout}
@@ -248,6 +259,7 @@ export default function App() {
           />
         ) : null}
         {abaAtiva === 'mensagem' ? <EditarMensagem /> : null}
+        {abaAtiva === 'modulos' ? <AcompanhamentoModulos /> : null}
         {abaAtiva === 'usuarios' && ehAdmin ? <CadastroUsuario /> : null}
       </main>
     </div>
