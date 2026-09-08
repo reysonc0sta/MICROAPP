@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from app.api.v1.router import api_router
 from app.core.database import engine, Base
 import app.models.domain  # Carrega as definições das tabelas
@@ -8,8 +9,30 @@ import os
 
 # Adiciona a pasta 'backend' ao caminho do Python
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# Cria as tabelas no MySQL automaticamente se não existirem
+# Cria as tabelas automaticamente se não existirem
 Base.metadata.create_all(bind=engine)
+
+
+def garantir_colunas():
+    """Adiciona colunas novas em bancos já existentes (create_all não altera tabelas)."""
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text(
+                """
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name = 'configuracoes_mensagem'
+                  AND column_name = 'template_lembrete'
+                """
+            )
+        ).scalar()
+        if not existe:
+            conn.execute(
+                text("ALTER TABLE configuracoes_mensagem ADD COLUMN template_lembrete TEXT")
+            )
+
+
+garantir_colunas()
 
 app = FastAPI(title="Plataforma Central de Alunos - API", version="1.0.0")
 

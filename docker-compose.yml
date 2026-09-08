@@ -11,9 +11,12 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    networks:
+      - microapp_net
 
   evolution_api:
-    image: evoapicloud/evolution-api:v2.3.7
+    image: evoapicloud/evolution-api:v2.1.1
     container_name: microapp_evolution
     restart: always
     ports:
@@ -34,6 +37,8 @@ services:
       - db
     volumes:
       - evolution_instances:/evolution/instances
+    networks:
+      - microapp_net
 
   backend:
     build: ./backend
@@ -49,6 +54,8 @@ services:
     depends_on:
       - db
       - evolution_api
+    networks:
+      - microapp_net
 
   frontend:
     build: ./frontend
@@ -63,6 +70,12 @@ services:
       - /app/node_modules
     depends_on:
       - backend
+    networks:
+      - microapp_net
+
+networks:
+  microapp_net:
+    driver: bridge
 
 volumes:
   postgres_data:

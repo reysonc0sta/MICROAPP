@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Login } from './features/auth/Login';
 import { ImportarPlanilha } from './features/whatsapp/ImportarPlanilha';
+import { DispararLembretes } from './features/whatsapp/DispararLembretes';
 import { CadastroUsuario } from './features/admin/CadastroUsuario';
 import { ConectarWhatsapp } from './features/whatsapp/ConectarWhatsapp';
 import { EditarMensagem } from './features/configuracoes/EditarMensagem';
-import { FileSpreadsheet, UserPlus, LogOut, Shield, QrCode, Menu, X, MessageSquareText } from 'lucide-react';
+import { FileSpreadsheet, UserPlus, LogOut, Shield, QrCode, Menu, X, MessageSquareText, Bell } from 'lucide-react';
 import { ThemeToggle } from './components/ThemeToggle';
 import { api } from './services/api';
 import { statusWhatsappConectado } from './features/whatsapp/statusWhatsapp';
@@ -97,24 +98,19 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <button type="button" onClick={() => irPara('conectar')} className={classeAba('conectar')}>
-              <QrCode size={16} />
-              Conectar WhatsApp
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${whatsappConectado ? 'bg-emerald-400' : 'bg-amber-400'}`}
-                title={whatsappConectado ? 'Conectado' : 'Desconectado'}
-              />
-            </button>
-
             <nav className="hidden items-center gap-1 lg:flex">
+              <button type="button" onClick={() => irPara('conectar')} className={classeAba('conectar')}>
+                <QrCode size={16} />
+                Conectar WhatsApp
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${whatsappConectado ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                  title={whatsappConectado ? 'Conectado' : 'Desconectado'}
+                />
+              </button>
+
               <button type="button" onClick={() => irPara('planilha')} className={classeAba('planilha')}>
                 <FileSpreadsheet size={16} />
                 Disparar Planilha
-              </button>
-
-              <button type="button" onClick={() => irPara('mensagem')} className={classeAba('mensagem')}>
-                <MessageSquareText size={16} />
-                Editar Mensagem
               </button>
 
               {ehAdmin ? (
@@ -123,6 +119,16 @@ export default function App() {
                   Gestão de Acessos
                 </button>
               ) : null}
+
+              <button type="button" onClick={() => irPara('lembretes')} className={classeAba('lembretes')}>
+                <Bell size={16} />
+                Lembretes
+              </button>
+
+              <button type="button" onClick={() => irPara('mensagem')} className={classeAba('mensagem')}>
+                <MessageSquareText size={16} />
+                Mensagem
+              </button>
 
               <button
                 type="button"
@@ -149,14 +155,18 @@ export default function App() {
 
         {menuAberto ? (
           <nav className="space-y-1 border-t border-white/10 px-4 py-3 lg:hidden">
+            <button type="button" onClick={() => irPara('conectar')} className={`${classeAba('conectar')} w-full`}>
+              <QrCode size={16} />
+              Conectar WhatsApp
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${whatsappConectado ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                title={whatsappConectado ? 'Conectado' : 'Desconectado'}
+              />
+            </button>
+
             <button type="button" onClick={() => irPara('planilha')} className={`${classeAba('planilha')} w-full`}>
               <FileSpreadsheet size={16} />
               Disparar Planilha
-            </button>
-
-            <button type="button" onClick={() => irPara('mensagem')} className={`${classeAba('mensagem')} w-full`}>
-              <MessageSquareText size={16} />
-              Editar Mensagem
             </button>
 
             {ehAdmin ? (
@@ -165,6 +175,16 @@ export default function App() {
                 Gestão de Acessos
               </button>
             ) : null}
+
+            <button type="button" onClick={() => irPara('lembretes')} className={`${classeAba('lembretes')} w-full`}>
+              <Bell size={16} />
+              Lembretes
+            </button>
+
+            <button type="button" onClick={() => irPara('mensagem')} className={`${classeAba('mensagem')} w-full`}>
+              <MessageSquareText size={16} />
+              Mensagem
+            </button>
 
             <button
               type="button"
@@ -184,6 +204,12 @@ export default function App() {
         ) : null}
         {abaAtiva === 'planilha' ? (
           <ImportarPlanilha
+            whatsappConectado={whatsappConectado}
+            onIrParaConexao={() => irPara('conectar')}
+          />
+        ) : null}
+        {abaAtiva === 'lembretes' ? (
+          <DispararLembretes
             whatsappConectado={whatsappConectado}
             onIrParaConexao={() => irPara('conectar')}
           />
