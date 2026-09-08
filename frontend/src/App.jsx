@@ -6,10 +6,30 @@ import { CadastroUsuario } from './features/admin/CadastroUsuario';
 import { ConectarWhatsapp } from './features/whatsapp/ConectarWhatsapp';
 import { EditarMensagem } from './features/configuracoes/EditarMensagem';
 import { AcompanhamentoModulos } from './features/acompanhamento/AcompanhamentoModulos';
-import { FileSpreadsheet, UserPlus, LogOut, Shield, QrCode, Menu, X, MessageSquareText, Bell, BookOpen } from 'lucide-react';
+import {
+  FileSpreadsheet,
+  UserPlus,
+  LogOut,
+  Shield,
+  QrCode,
+  Menu,
+  X,
+  MessageSquareText,
+  Bell,
+  BookOpen,
+} from 'lucide-react';
 import { ThemeToggle } from './components/ThemeToggle';
 import { api } from './services/api';
 import { statusWhatsappConectado } from './features/whatsapp/statusWhatsapp';
+
+const NAV_ITEMS = [
+  { id: 'conectar', label: 'Conectar WhatsApp', icon: QrCode, admin: false },
+  { id: 'planilha', label: 'Disparar Planilha', icon: FileSpreadsheet, admin: false },
+  { id: 'usuarios', label: 'Gestão de Acessos', icon: UserPlus, admin: true },
+  { id: 'lembretes', label: 'Lembretes', icon: Bell, admin: false },
+  { id: 'mensagem', label: 'Mensagem', icon: MessageSquareText, admin: false },
+  { id: 'modulos', label: 'Módulos', icon: BookOpen, admin: false },
+];
 
 export default function App() {
   const [usuario, setUsuario] = useState(null);
@@ -96,7 +116,7 @@ export default function App() {
 
   if (validandoSessao) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-navy-50 text-sm text-navy-600 dark:bg-navy-950 dark:text-navy-300">
+      <div className="flex min-h-svh items-center justify-center bg-zinc-100 text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-400">
         Validando sessão...
       </div>
     );
@@ -108,6 +128,7 @@ export default function App() {
 
   const ehAdmin = ['ADM', 'DIRETOR'].includes(usuario.cargo);
   const whatsappConectado = whatsappStatus === 'CONNECTED';
+  const itensNav = NAV_ITEMS.filter((item) => !item.admin || ehAdmin);
 
   const irPara = (aba) => {
     setAbaAtiva(aba);
@@ -115,79 +136,49 @@ export default function App() {
   };
 
   const classeAba = (aba) =>
-    `inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+    `inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-all duration-200 ${
       abaAtiva === aba
-        ? 'bg-white text-navy-900 shadow-sm dark:bg-navy-700 dark:text-white'
-        : 'text-navy-100 hover:bg-white/10'
+        ? 'bg-navy-800 text-white shadow-sm dark:bg-navy-600'
+        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
     }`;
 
   return (
-    <div className="min-h-svh bg-navy-50 font-sans text-navy-900 dark:bg-navy-950 dark:text-navy-50">
-      <header className="sticky top-0 z-20 border-b border-navy-900/20 bg-navy-800 text-white shadow-md dark:border-navy-700 dark:bg-navy-900">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-bold tracking-tight sm:text-xl">MicroApp</h1>
-            <span className="mt-0.5 flex items-center gap-1 text-xs text-navy-200">
-              <Shield size={12} className="shrink-0 text-emerald-300" />
-              <span className="truncate">
-                <strong>{usuario.nome}</strong> ({usuario.cargo})
+    <div className="min-h-svh bg-zinc-100 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-50">
+      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/80">
+        {/* Barra superior */}
+        <div className="flex w-full items-center justify-between gap-4 px-4 py-2.5 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-navy-800 text-white shadow-sm dark:bg-navy-600">
+              <Shield size={18} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-bold tracking-tight text-slate-900 sm:text-base dark:text-white">
+                MicroApp
+              </h1>
+              <span className="mt-0.5 inline-flex max-w-full items-center gap-1.5 truncate rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                <span className="truncate">
+                  {usuario.nome}
+                  <span className="text-slate-400 dark:text-slate-500"> · {usuario.cargo}</span>
+                </span>
               </span>
-            </span>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <nav className="hidden items-center gap-1 lg:flex">
-              <button type="button" onClick={() => irPara('conectar')} className={classeAba('conectar')}>
-                <QrCode size={16} />
-                Conectar WhatsApp
-                <span
-                  className={`h-2.5 w-2.5 rounded-full ${whatsappConectado ? 'bg-emerald-400' : 'bg-amber-400'}`}
-                  title={whatsappConectado ? 'Conectado' : 'Desconectado'}
-                />
-              </button>
-
-              <button type="button" onClick={() => irPara('planilha')} className={classeAba('planilha')}>
-                <FileSpreadsheet size={16} />
-                Disparar Planilha
-              </button>
-
-              {ehAdmin ? (
-                <button type="button" onClick={() => irPara('usuarios')} className={classeAba('usuarios')}>
-                  <UserPlus size={16} />
-                  Gestão de Acessos
-                </button>
-              ) : null}
-
-              <button type="button" onClick={() => irPara('lembretes')} className={classeAba('lembretes')}>
-                <Bell size={16} />
-                Lembretes
-              </button>
-
-              <button type="button" onClick={() => irPara('mensagem')} className={classeAba('mensagem')}>
-                <MessageSquareText size={16} />
-                Mensagem
-              </button>
-
-              <button type="button" onClick={() => irPara('modulos')} className={classeAba('modulos')}>
-                <BookOpen size={16} />
-                Acompanhamento de Módulos
-              </button>
-
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="inline-flex items-center gap-1 rounded-xl px-3 py-2.5 text-sm font-medium text-red-200 transition hover:bg-red-500/20 hover:text-white"
-              >
-                <LogOut size={16} />
-                Sair
-              </button>
-            </nav>
-
-            <ThemeToggle variant="onNavy" />
-
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <ThemeToggle />
             <button
               type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 lg:hidden"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-slate-500 transition hover:bg-red-50 hover:text-red-600 dark:text-slate-400 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+              title="Sair"
+            >
+              <LogOut size={16} />
+              <span className="hidden sm:inline">Sair</span>
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 md:hidden dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               aria-label={menuAberto ? 'Fechar menu' : 'Abrir menu'}
               onClick={() => setMenuAberto((aberto) => !aberto)}
             >
@@ -196,53 +187,48 @@ export default function App() {
           </div>
         </div>
 
+        {/* Abas desktop / tablet */}
+        <nav className="hidden w-full gap-1 overflow-x-auto px-4 pb-2.5 sm:px-6 md:flex lg:px-8">
+          {itensNav.map(({ id, label, icon: Icon }) => (
+            <button key={id} type="button" onClick={() => irPara(id)} className={classeAba(id)}>
+              <Icon size={15} />
+              {label}
+              {id === 'conectar' ? (
+                <span
+                  className={`h-2 w-2 rounded-full ${whatsappConectado ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                  title={whatsappConectado ? 'Conectado' : 'Desconectado'}
+                />
+              ) : null}
+            </button>
+          ))}
+        </nav>
+
+        {/* Menu mobile */}
         {menuAberto ? (
-          <nav className="space-y-1 border-t border-white/10 px-4 py-3 lg:hidden">
-            <button type="button" onClick={() => irPara('conectar')} className={`${classeAba('conectar')} w-full`}>
-              <QrCode size={16} />
-              Conectar WhatsApp
-            </button>
-
-            <button type="button" onClick={() => irPara('planilha')} className={`${classeAba('planilha')} w-full`}>
-              <FileSpreadsheet size={16} />
-              Disparar Planilha
-            </button>
-
-            {ehAdmin ? (
-              <button type="button" onClick={() => irPara('usuarios')} className={`${classeAba('usuarios')} w-full`}>
-                <UserPlus size={16} />
-                Gestão de Acessos
+          <nav className="space-y-1 border-t border-slate-200 px-4 py-3 md:hidden dark:border-slate-800">
+            {itensNav.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => irPara(id)}
+                className={`${classeAba(id)} w-full justify-start`}
+              >
+                <Icon size={15} />
+                {label}
+                {id === 'conectar' ? (
+                  <span
+                    className={`ml-auto h-2 w-2 rounded-full ${
+                      whatsappConectado ? 'bg-emerald-400' : 'bg-amber-400'
+                    }`}
+                  />
+                ) : null}
               </button>
-            ) : null}
-
-            <button type="button" onClick={() => irPara('lembretes')} className={`${classeAba('lembretes')} w-full`}>
-              <Bell size={16} />
-              Lembretes
-            </button>
-
-            <button type="button" onClick={() => irPara('mensagem')} className={`${classeAba('mensagem')} w-full`}>
-              <MessageSquareText size={16} />
-              Mensagem
-            </button>
-
-            <button type="button" onClick={() => irPara('modulos')} className={`${classeAba('modulos')} w-full`}>
-              <BookOpen size={16} />
-              Acompanhamento de Módulos
-            </button>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-red-200 hover:bg-red-500/20 hover:text-white"
-            >
-              <LogOut size={16} />
-              Sair
-            </button>
+            ))}
           </nav>
         ) : null}
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+      <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
         {abaAtiva === 'conectar' ? (
           <ConectarWhatsapp onStatusChange={(status) => atualizarStatusWhatsapp(status === 'CONNECTED')} />
         ) : null}

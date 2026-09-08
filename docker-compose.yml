@@ -23,7 +23,7 @@ services:
       retries: 10
 
   evolution_api:
-    image: evoapicloud/evolution-api:v2.1.1
+    image: evoapicloud/evolution-api:v2.3.7
     container_name: microapp_evolution
     restart: always
     env_file:
@@ -38,10 +38,13 @@ services:
       - DATABASE_PROVIDER=postgresql
       - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-root}@db:5432/evolution_db?schema=public
       - DATABASE_CONNECTION_CLIENT_NAME=microapp_evolution
+      - DATABASE_SAVE_DATA_INSTANCE=true
       - CACHE_REDIS_ENABLED=false
+      - CACHE_LOCAL_ENABLED=true
       - CONFIG_SESSION_PHONE_CLIENT=Chrome
       - CONFIG_SESSION_PHONE_NAME=Chrome
       - QRCODE_LIMIT=30
+      - LANGUAGE=pt-BR
     depends_on:
       db:
         condition: service_healthy

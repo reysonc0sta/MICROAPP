@@ -32,24 +32,26 @@ export function Login({ onLoginSuccess }) {
   };
 
   return (
-    <div className="relative flex min-h-svh items-center justify-center bg-navy-50 p-4 dark:bg-navy-950">
+    <div className="relative flex min-h-svh items-center justify-center bg-zinc-100 p-4 dark:bg-slate-950">
       <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
         <ThemeToggle />
       </div>
 
-      <div className="card w-full max-w-md">
+      <div className="card w-full max-w-md shadow-md">
         <div className="mb-6 text-center">
-          <div className="mb-3 inline-flex rounded-2xl bg-navy-800 p-3 text-white dark:bg-navy-500">
+          <div className="mb-3 inline-flex rounded-2xl bg-navy-800 p-3 text-white shadow-sm dark:bg-navy-600">
             <Shield size={28} />
           </div>
-          <h2 className="text-2xl font-bold text-navy-900 dark:text-white">Acesso ao Sistema</h2>
-          <p className="mt-1 text-sm text-navy-500 dark:text-navy-300">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Acesso ao Sistema
+          </h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Entre com suas credenciais para continuar
           </p>
         </div>
 
         {erro ? (
-          <div className="mb-4 flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-300">
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             <span>{erro}</span>
           </div>
@@ -57,7 +59,7 @@ export function Login({ onLoginSuccess }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-navy-800 dark:text-navy-100">E-mail</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">E-mail</label>
             <input
               type="email"
               required
@@ -69,7 +71,7 @@ export function Login({ onLoginSuccess }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-navy-800 dark:text-navy-100">Senha</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Senha</label>
             <input
               type="password"
               required
