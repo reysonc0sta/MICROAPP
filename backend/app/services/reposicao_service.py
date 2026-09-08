@@ -17,6 +17,8 @@ from app.services.planilha_io import (
     validar_colunas,
 )
 
+MIN_FALTAS_DISPARO = 2
+
 
 def montar_candidatos_disparo(caminho_arquivo: str, template: str = TEMPLATE_PADRAO) -> list[dict]:
     """
@@ -31,7 +33,7 @@ def montar_candidatos_disparo(caminho_arquivo: str, template: str = TEMPLATE_PAD
     if "Status Contrato" in df.columns:
         df = df[df["Status Contrato"] == "Ativo"]
 
-    com_faltas = df[df["Faltas"] > 0]
+    com_faltas = df[df["Faltas"] >= MIN_FALTAS_DISPARO]
     candidatos = []
 
     for _, row in com_faltas.iterrows():
@@ -39,7 +41,7 @@ def montar_candidatos_disparo(caminho_arquivo: str, template: str = TEMPLATE_PAD
         if not nome:
             continue
         faltas = celula_int(row["Faltas"])
-        if faltas <= 0:
+        if faltas < MIN_FALTAS_DISPARO:
             continue
         tel_aluno = celula_texto(row.get("Telefone Aluno"))
         tel_resp = celula_texto(row.get("Telefone Responsável"))

@@ -25,8 +25,7 @@ const EXEMPLO_NOME = 'João';
 const EXEMPLO_FALTAS = 2;
 const TEMPLATE_PADRAO =
   'Olá, {nome}! Notamos que você possui {faltas} falta(s) registrada(s). ' +
-  'Lembrando que esta é a última semana para realizar a reposição do mês! ' +
-  'Por favor, responda a esta mensagem para agendarmos o seu horário.';
+  'Lembrando que esta é a última semana para realizar a reposição do mês!';
 
 function primeiroNome(nome) {
   const parte = String(nome || '').trim().split(/\s+/)[0] || '';
@@ -341,6 +340,7 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
           </h2>
           <p className="page-subtitle mt-1">
             Envie a planilha, ajuste a mensagem, revise a prévia e confirme o disparo em massa.
+            Somente alunos com 2 ou mais faltas recebem a mensagem.
           </p>
         </div>
         {arquivo && !carregando ? (

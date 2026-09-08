@@ -15,8 +15,7 @@ import {
 
 const TEMPLATE_PADRAO =
   'Olá, {nome}! Notamos que você possui {faltas} falta(s) registrada(s). ' +
-  'Lembrando que esta é a última semana para realizar a reposição do mês! ' +
-  'Por favor, responda a esta mensagem para agendarmos o seu horário.';
+  'Lembrando que esta é a última semana para realizar a reposição do mês!';
 
 const PLACEHOLDERS = [
   { tag: '{nome}', label: 'Nome do aluno', descricao: 'Primeiro nome' },
