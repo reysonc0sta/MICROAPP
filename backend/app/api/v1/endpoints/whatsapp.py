@@ -26,6 +26,7 @@ from app.services.whatsapp_service import (
     conectar_whatsapp,
     disparar_mensagem_real,
     exigir_whatsapp_conectado,
+    nome_instancia_usuario,
     obter_estado_conexao,
     whatsapp_esta_conectado,
 )
@@ -67,20 +68,20 @@ async def _salvar_upload_seguro(file: UploadFile) -> str:
     return path
 
 
-def _job_disparar_faltas(caminho: str) -> None:
+def _job_disparar_faltas(caminho: str, instance_name: str) -> None:
     db = SessionLocal()
     try:
-        processar_disparos_faltas_excel(caminho, db)
+        processar_disparos_faltas_excel(caminho, db, instance_name)
     finally:
         db.close()
         if os.path.exists(caminho):
             os.remove(caminho)
 
 
-def _job_disparar_lembretes(caminho: str, turno: str) -> None:
+def _job_disparar_lembretes(caminho: str, turno: str, instance_name: str) -> None:
     db = SessionLocal()
     try:
-        processar_lembretes_excel(caminho, db, turno)
+        processar_lembretes_excel(caminho, db, turno, instance_name)
     finally:
         db.close()
         if os.path.exists(caminho):
@@ -88,31 +89,39 @@ def _job_disparar_lembretes(caminho: str, turno: str) -> None:
 
 
 @router.get("/status")
-def status_whatsapp(_: Usuario = Depends(get_current_user)):
-    estado = obter_estado_conexao()
-    conectado = whatsapp_esta_conectado()
+def status_whatsapp(usuario: Usuario = Depends(get_current_user)):
+    instance_name = nome_instancia_usuario(usuario)
+    estado = obter_estado_conexao(instance_name)
+    conectado = whatsapp_esta_conectado(instance_name)
     return {
         "state": "open" if conectado else estado,
-        "instance": {"state": "open" if conectado else estado},
+        "instance": {"state": "open" if conectado else estado, "instanceName": instance_name},
         "conectado": conectado,
+        "instanceName": instance_name,
     }
 
 
 @router.get("/conectar")
-def conectar(forcar: bool = False, _: Usuario = Depends(get_current_user)):
-    """Consulta/cria a instância hub_escola e retorna o QR Code (base64) para conexão."""
-    return conectar_whatsapp(forcar_novo=forcar)
+def conectar(forcar: bool = False, usuario: Usuario = Depends(get_current_user)):
+    """Cria/consulta a instância Evolution deste usuário e retorna o QR Code."""
+    instance_name = nome_instancia_usuario(usuario)
+    return conectar_whatsapp(instance_name, forcar_novo=forcar)
 
 
 @router.post("/enviar-direto")
-def enviar_direto(body: EnviarDiretoBody, _: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Dispara uma mensagem individual via Evolution API."""
-    exigir_whatsapp_conectado()
+def enviar_direto(
+    body: EnviarDiretoBody,
+    usuario: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Dispara uma mensagem individual via Evolution API na instância do usuário."""
+    instance_name = nome_instancia_usuario(usuario)
+    exigir_whatsapp_conectado(instance_name)
     numero = limpar_telefone(body.numero)
     if not numero:
         raise HTTPException(status_code=400, detail="Número de telefone inválido.")
 
-    enviado = disparar_mensagem_real(numero, body.texto)
+    enviado = disparar_mensagem_real(numero, body.texto, instance_name)
     registrar_envio_whatsapp(
         db,
         numero=numero,
@@ -130,6 +139,7 @@ def enviar_direto(body: EnviarDiretoBody, _: Usuario = Depends(get_current_user)
         "sucesso": True,
         "numero": numero,
         "mensagem": "Mensagem enviada com sucesso.",
+        "instanceName": instance_name,
     }
 
 
@@ -144,6 +154,8 @@ async def preview_planilha(
     try:
         template = obter_template_mensagem(db)
         resultado = await asyncio.to_thread(preview_disparos_faltas_excel, temp_path, template)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -187,22 +199,24 @@ async def disparar_lembretes(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     turno: str = Form("TODOS"),
-    _: Usuario = Depends(get_current_user),
+    usuario: Usuario = Depends(get_current_user),
 ):
-    exigir_whatsapp_conectado()
+    instance_name = nome_instancia_usuario(usuario)
+    exigir_whatsapp_conectado(instance_name)
 
     turno_norm = (turno or "TODOS").strip().upper()
     if turno_norm not in TURNOS_VALIDOS:
         raise HTTPException(status_code=400, detail="Turno inválido. Use MANHA, TARDE, NOITE ou TODOS.")
 
     temp_path = await _salvar_upload_seguro(file)
-    background_tasks.add_task(_job_disparar_lembretes, temp_path, turno_norm)
+    background_tasks.add_task(_job_disparar_lembretes, temp_path, turno_norm, instance_name)
 
     return {
         "mensagem": f"Lembretes do turno {turno_norm} iniciados em segundo plano. O histórico será gravado no banco.",
         "status": "PROCESSANDO",
         "nome_arquivo": file.filename,
         "turno": turno_norm,
+        "instanceName": instance_name,
     }
 
 
@@ -210,15 +224,17 @@ async def disparar_lembretes(
 async def upload_planilha(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    _: Usuario = Depends(get_current_user),
+    usuario: Usuario = Depends(get_current_user),
 ):
-    exigir_whatsapp_conectado()
+    instance_name = nome_instancia_usuario(usuario)
+    exigir_whatsapp_conectado(instance_name)
     temp_path = await _salvar_upload_seguro(file)
-    background_tasks.add_task(_job_disparar_faltas, temp_path)
+    background_tasks.add_task(_job_disparar_faltas, temp_path, instance_name)
     return {
         "mensagem": "Disparo de reposição iniciado em segundo plano. O histórico será gravado no banco.",
         "status": "PROCESSANDO",
         "nome_arquivo": file.filename,
+        "instanceName": instance_name,
     }
 
 
@@ -226,13 +242,15 @@ async def upload_planilha(
 async def disparar_reposicoes(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    _: Usuario = Depends(get_current_user),
+    usuario: Usuario = Depends(get_current_user),
 ):
-    exigir_whatsapp_conectado()
+    instance_name = nome_instancia_usuario(usuario)
+    exigir_whatsapp_conectado(instance_name)
     temp_path = await _salvar_upload_seguro(file)
-    background_tasks.add_task(_job_disparar_faltas, temp_path)
+    background_tasks.add_task(_job_disparar_faltas, temp_path, instance_name)
     return {
         "mensagem": "Disparo de reposição iniciado em segundo plano. O histórico será gravado no banco.",
         "status": "PROCESSANDO",
         "nome_arquivo": file.filename,
+        "instanceName": instance_name,
     }

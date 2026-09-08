@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { ThemeToggle } from './components/ThemeToggle';
 import { api } from './services/api';
-import { statusWhatsappConectado } from './features/whatsapp/statusWhatsapp';
+import { statusWhatsappConectado, lerStatusWhatsapp, gravarStatusWhatsapp, limparStatusWhatsapp } from './features/whatsapp/statusWhatsapp';
 
 const NAV_ITEMS = [
   { id: 'conectar', label: 'Conectar WhatsApp', icon: QrCode, admin: false },
@@ -36,20 +36,20 @@ export default function App() {
   const [abaAtiva, setAbaAtiva] = useState('conectar');
   const [menuAberto, setMenuAberto] = useState(false);
   const [validandoSessao, setValidandoSessao] = useState(true);
-  const [whatsappStatus, setWhatsappStatus] = useState(
-    localStorage.getItem('whatsapp_status') || 'DISCONNECTED'
-  );
+  const [whatsappStatus, setWhatsappStatus] = useState('DISCONNECTED');
 
-  const atualizarStatusWhatsapp = (conectado) => {
+  const atualizarStatusWhatsapp = (conectado, usuarioId = usuario?.id) => {
     const status = conectado ? 'CONNECTED' : 'DISCONNECTED';
     setWhatsappStatus(status);
-    localStorage.setItem('whatsapp_status', status);
+    if (usuarioId) {
+      gravarStatusWhatsapp(usuarioId, status);
+    }
   };
 
   const handleLogout = () => {
+    limparStatusWhatsapp(usuario?.id);
     localStorage.removeItem('token');
     localStorage.removeItem('usuario');
-    localStorage.removeItem('whatsapp_status');
     setWhatsappStatus('DISCONNECTED');
     setUsuario(null);
     setMenuAberto(false);
@@ -78,6 +78,7 @@ export default function App() {
         const { data } = await api.get('/usuarios/me');
         localStorage.setItem('usuario', JSON.stringify(data));
         setUsuario(data);
+        setWhatsappStatus(lerStatusWhatsapp(data.id));
       } catch {
         handleLogout();
       } finally {
@@ -91,17 +92,19 @@ export default function App() {
   useEffect(() => {
     if (!usuario) return undefined;
 
+    setWhatsappStatus(lerStatusWhatsapp(usuario.id));
+
     let cancelado = false;
 
     const consultar = async () => {
       try {
         const { data } = await api.get('/whatsapp/status');
         if (!cancelado) {
-          atualizarStatusWhatsapp(statusWhatsappConectado(data));
+          atualizarStatusWhatsapp(statusWhatsappConectado(data), usuario.id);
         }
       } catch {
         if (!cancelado) {
-          atualizarStatusWhatsapp(false);
+          atualizarStatusWhatsapp(false, usuario.id);
         }
       }
     };
@@ -123,7 +126,14 @@ export default function App() {
   }
 
   if (!usuario) {
-    return <Login onLoginSuccess={(u) => setUsuario(u)} />;
+    return (
+      <Login
+        onLoginSuccess={(u) => {
+          setUsuario(u);
+          setWhatsappStatus(lerStatusWhatsapp(u.id));
+        }}
+      />
+    );
   }
 
   const ehAdmin = ['ADM', 'DIRETOR'].includes(usuario.cargo);
@@ -230,7 +240,7 @@ export default function App() {
 
       <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
         {abaAtiva === 'conectar' ? (
-          <ConectarWhatsapp onStatusChange={(status) => atualizarStatusWhatsapp(status === 'CONNECTED')} />
+          <ConectarWhatsapp onStatusChange={(status) => atualizarStatusWhatsapp(status === 'CONNECTED', usuario.id)} />
         ) : null}
         {abaAtiva === 'planilha' ? (
           <ImportarPlanilha

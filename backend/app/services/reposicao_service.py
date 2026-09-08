@@ -1,4 +1,3 @@
-import pandas as pd
 from datetime import datetime
 from sqlalchemy.orm import Session
 
@@ -10,6 +9,13 @@ from app.services.config_service import (
     obter_template_mensagem,
     renderizar_mensagem,
 )
+from app.services.planilha_io import (
+    COLUNAS_OBRIGATORIAS_FALTAS,
+    celula_int,
+    celula_texto,
+    ler_planilha_excel,
+    validar_colunas,
+)
 
 
 def montar_candidatos_disparo(caminho_arquivo: str, template: str = TEMPLATE_PADRAO) -> list[dict]:
@@ -18,7 +24,8 @@ def montar_candidatos_disparo(caminho_arquivo: str, template: str = TEMPLATE_PAD
     sem enviar nenhuma mensagem. Usado tanto pelo preview quanto pelo
     disparo real, para garantir que os dois mostrem exatamente a mesma coisa.
     """
-    df = pd.read_excel(caminho_arquivo)
+    df = ler_planilha_excel(caminho_arquivo)
+    validar_colunas(df, COLUNAS_OBRIGATORIAS_FALTAS)
     df = df.dropna(subset=["Nome Aluno"])
 
     if "Status Contrato" in df.columns:
@@ -28,10 +35,14 @@ def montar_candidatos_disparo(caminho_arquivo: str, template: str = TEMPLATE_PAD
     candidatos = []
 
     for _, row in com_faltas.iterrows():
-        nome = str(row["Nome Aluno"]).strip()
-        faltas = int(row["Faltas"])
-        tel_aluno = row.get("Telefone Aluno")
-        tel_resp = row.get("Telefone Responsável")
+        nome = celula_texto(row["Nome Aluno"])
+        if not nome:
+            continue
+        faltas = celula_int(row["Faltas"])
+        if faltas <= 0:
+            continue
+        tel_aluno = celula_texto(row.get("Telefone Aluno"))
+        tel_resp = celula_texto(row.get("Telefone Responsável"))
         canais = candidatos_envio(tel_aluno, tel_resp)
         contato = obter_telefone_envio(tel_aluno, tel_resp)
 
@@ -66,7 +77,11 @@ def preview_disparos_faltas_excel(caminho_arquivo: str, template: str = TEMPLATE
     }
 
 
-def processar_disparos_faltas_excel(caminho_arquivo: str, db: Session) -> dict:
+def processar_disparos_faltas_excel(
+    caminho_arquivo: str,
+    db: Session,
+    instance_name: str,
+) -> dict:
     """
     Lê a planilha, envia alertas com fallback pessoal→comercial e grava histórico.
     """
@@ -89,7 +104,7 @@ def processar_disparos_faltas_excel(caminho_arquivo: str, db: Session) -> dict:
         usou_fallback = False
 
         for canal in canais:
-            if disparar_mensagem_real(canal["numero"], candidato["mensagem"]):
+            if disparar_mensagem_real(canal["numero"], candidato["mensagem"], instance_name):
                 enviado = True
                 canal_usado = canal["canal"]
                 numero_usado = canal["numero"]

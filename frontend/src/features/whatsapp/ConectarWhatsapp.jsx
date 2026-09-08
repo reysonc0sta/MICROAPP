@@ -12,7 +12,7 @@ import {
   Link2,
   ListOrdered,
 } from 'lucide-react';
-import { statusWhatsappConectado } from './statusWhatsapp';
+import { statusWhatsappConectado, gravarStatusWhatsapp } from './statusWhatsapp';
 
 const PASSOS = [
   'Abra o WhatsApp no celular.',
@@ -20,6 +20,14 @@ const PASSOS = [
   'Escolha Conectar um aparelho e escaneie o QR Code.',
   'Aguarde a confirmação “Conectado” nesta tela.',
 ];
+
+function lerUsuarioId() {
+  try {
+    return JSON.parse(localStorage.getItem('usuario') || 'null')?.id;
+  } catch {
+    return null;
+  }
+}
 
 export function ConectarWhatsapp({ onStatusChange }) {
   const [qrCode, setQrCode] = useState('');
@@ -29,14 +37,18 @@ export function ConectarWhatsapp({ onStatusChange }) {
   const [segundosQr, setSegundosQr] = useState(20);
   const [pairingCode, setPairingCode] = useState('');
   const [estadoInstancia, setEstadoInstancia] = useState('close');
+  const [instanceName, setInstanceName] = useState('');
   const conectadoRef = useRef(false);
   const emVooRef = useRef(false);
+  const usuarioId = lerUsuarioId();
 
   const informarStatus = (conectado) => {
     conectadoRef.current = conectado;
     const valor = conectado ? 'CONNECTED' : 'DISCONNECTED';
     setStatus(valor);
-    localStorage.setItem('whatsapp_status', valor);
+    if (usuarioId) {
+      gravarStatusWhatsapp(usuarioId, valor);
+    }
     if (onStatusChange) onStatusChange(valor);
   };
 
@@ -45,6 +57,9 @@ export function ConectarWhatsapp({ onStatusChange }) {
     const estado = String(data?.instance?.state || data?.state || (conectado ? 'open' : 'close'));
     setEstadoInstancia(estado);
     setPairingCode(data?.pairingCode || '');
+    if (data?.instanceName || data?.instance?.instanceName) {
+      setInstanceName(data.instanceName || data.instance.instanceName);
+    }
 
     if (conectado) {
       setQrCode('');
@@ -135,7 +150,16 @@ export function ConectarWhatsapp({ onStatusChange }) {
           Conectar WhatsApp
         </h2>
         <p className="page-subtitle mt-1">
-          Painel de conexão da instância Evolution API. Escaneie o QR Code para liberar os disparos.
+          Cada login conecta o próprio número de WhatsApp. Escaneie o QR Code com o celular desta conta
+          para liberar os disparos
+          {instanceName ? (
+            <>
+              {' '}
+              (<span className="font-medium text-slate-600 dark:text-slate-300">{instanceName}</span>).
+            </>
+          ) : (
+            '.'
+          )}
         </p>
       </div>
 

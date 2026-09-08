@@ -10,6 +10,7 @@ python-jose
 bcrypt==4.0.1
 pandas
 openpyxl
+xlrd>=2.0.1
 python-multipart
 requests
 qrcode
