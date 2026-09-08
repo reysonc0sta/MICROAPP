@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { api } from '../../services/api';
+import { api, apiErrorMessage } from '../../services/api';
 import { LogIn, AlertCircle, Shield } from 'lucide-react';
 import { ThemeToggle } from '../../components/ThemeToggle';
 
@@ -14,7 +14,10 @@ export function Login({ onLoginSuccess }) {
     setCarregando(true);
 
     try {
-      const response = await api.post('/usuarios/login', form);
+      const response = await api.post('/usuarios/login', {
+        email: form.email.trim(),
+        senha: form.senha,
+      });
       const { access_token, usuario } = response.data;
 
       localStorage.setItem('token', access_token);
@@ -22,7 +25,7 @@ export function Login({ onLoginSuccess }) {
 
       onLoginSuccess(usuario);
     } catch (err) {
-      setErro(err.response?.data?.detail || 'Falha ao autenticar. Verifique seus dados.');
+      setErro(apiErrorMessage(err, 'Falha ao autenticar. Verifique seus dados.'));
     } finally {
       setCarregando(false);
     }

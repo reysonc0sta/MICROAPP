@@ -1,11 +1,12 @@
-import os
 import time
 import requests
 from fastapi import HTTPException
 
-EVOLUTION_URL = os.getenv("EVOLUTION_API_URL", "http://evolution_api:8080").rstrip("/")
-API_KEY = os.getenv("EVOLUTION_API_KEY", "42d713280036")
-INSTANCE_NAME = os.getenv("EVOLUTION_INSTANCE_NAME", "hub_escola")
+from app.core.config import settings
+
+EVOLUTION_URL = settings.EVOLUTION_API_URL.rstrip("/")
+API_KEY = settings.EVOLUTION_API_KEY
+INSTANCE_NAME = settings.EVOLUTION_INSTANCE_NAME
 
 MENSAGEM_DESCONECTADO = (
     "WhatsApp desconectado. Conecte o aparelho pelo QR Code antes de enviar planilhas ou disparar mensagens."
@@ -198,7 +199,7 @@ def conectar_whatsapp(forcar_novo: bool = False) -> dict:
 
 
 def disparar_mensagem_real(numero: str, texto: str) -> bool:
-    """Envia uma mensagem de texto via Evolution API (POST /message/sendText/hub_escola)."""
+    """Envia uma mensagem de texto via Evolution API (POST /message/sendText/{instance})."""
     url = f"{EVOLUTION_URL}/message/sendText/{INSTANCE_NAME}"
     payload = {
         "number": numero,
@@ -215,7 +216,7 @@ def disparar_mensagem_real(numero: str, texto: str) -> bool:
         response = requests.post(
             url,
             json=payload,
-            headers={"apikey": API_KEY, "Content-Type": "application/json"},
+            headers=_headers(),
             timeout=15,
         )
         return response.status_code in (200, 201)

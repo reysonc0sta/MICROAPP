@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../../services/api';
+import { api, apiErrorMessage } from '../../services/api';
 import {
   Upload,
   Bell,
@@ -33,6 +33,8 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState('');
   const [salvandoMsg, setSalvandoMsg] = useState(false);
+  const [msgSalva, setMsgSalva] = useState('');
+  const [inputKey, setInputKey] = useState(0);
 
   useEffect(() => {
     const carregar = async () => {
@@ -52,6 +54,7 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
     setArquivo(null);
     setPreview(null);
     setResultado(null);
+    setInputKey((k) => k + 1);
   };
 
   const carregarPreview = async (file, turnoSelecionado = turno) => {
@@ -70,7 +73,7 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
       });
       setPreview(response.data);
     } catch (err) {
-      setErro(err.response?.data?.detail || 'Erro ao ler a planilha para pré-visualização.');
+      setErro(apiErrorMessage(err, 'Erro ao ler a planilha para pré-visualização.'));
       setArquivo(null);
     } finally {
       setCarregandoPreview(false);
@@ -104,14 +107,16 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
   const handleSalvarMensagem = async () => {
     setSalvandoMsg(true);
     setErro('');
+    setMsgSalva('');
     try {
       const { data } = await api.put('/configuracoes/mensagem-lembrete', { template });
       setTemplate(data.template);
+      setMsgSalva('Mensagem salva com sucesso.');
       if (arquivo) {
         await carregarPreview(arquivo, turno);
       }
     } catch (err) {
-      setErro(err.response?.data?.detail || 'Erro ao salvar a mensagem do lembrete.');
+      setErro(apiErrorMessage(err, 'Erro ao salvar a mensagem do lembrete.'));
     } finally {
       setSalvandoMsg(false);
     }
@@ -150,7 +155,7 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
       });
       setResultado(response.data);
     } catch (err) {
-      setErro(err.response?.data?.detail || 'Erro ao processar o disparo de lembretes.');
+      setErro(apiErrorMessage(err, 'Erro ao processar o disparo de lembretes.'));
     } finally {
       setCarregando(false);
     }
@@ -188,7 +193,8 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
               key={valor}
               type="button"
               onClick={() => handleTrocarTurno(valor)}
-              className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+              disabled={carregandoPreview || carregando}
+              className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition disabled:opacity-50 ${
                 turno === valor
                   ? 'border-navy-700 bg-navy-800 text-white dark:border-navy-400 dark:bg-navy-500'
                   : 'border-navy-200 bg-white text-navy-800 hover:bg-navy-50 dark:border-navy-600 dark:bg-navy-900 dark:text-navy-100 dark:hover:bg-navy-800'
@@ -224,6 +230,7 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
           >
             {salvandoMsg ? 'Salvando...' : 'Salvar mensagem'}
           </button>
+          {msgSalva ? <span className="text-emerald-600 dark:text-emerald-400">{msgSalva}</span> : null}
         </div>
       </div>
 
@@ -235,10 +242,11 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
         }`}
       >
         <input
+          key={inputKey}
           type="file"
           accept=".xlsx, .xls"
           onChange={handleFileChange}
-          disabled={!whatsappConectado || carregandoPreview}
+          disabled={!whatsappConectado || carregandoPreview || carregando}
           className="absolute inset-0 h-full w-full opacity-0 disabled:cursor-not-allowed"
         />
         <Upload className="mx-auto mb-3 h-12 w-12 text-navy-400" />
@@ -325,8 +333,15 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
             <span>{resultado.mensagem}</span>
           </div>
           <p className="text-xs text-emerald-700 dark:text-emerald-400">
-            Arquivo: <strong>{resultado.nome_arquivo}</strong> | Mensagens disparadas:{' '}
-            <strong>{resultado.total_registros_identificados}</strong>
+            Arquivo: <strong>{resultado.nome_arquivo}</strong>
+            {resultado.status === 'PROCESSANDO' ? (
+              <> | Status: <strong>em segundo plano</strong></>
+            ) : (
+              <>
+                {' '}
+                | Mensagens: <strong>{resultado.total_registros_identificados}</strong>
+              </>
+            )}
           </p>
         </div>
       ) : null}

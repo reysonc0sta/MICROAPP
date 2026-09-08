@@ -1,28 +1,33 @@
+import os
 from app.core.database import SessionLocal, engine, Base
 from app.models.domain import Usuario
 from app.core.security import gerar_hash_senha
 
-# Garante que as tabelas existem
 Base.metadata.create_all(bind=engine)
 
 db = SessionLocal()
 
-# Verifica se já existe um admin
-admin_existente = db.query(Usuario).filter(Usuario.email == "admin@escola.com").first()
+admin_email = os.getenv("ADMIN_EMAIL", "admin@escola.com").lower().strip()
+admin_password = os.getenv("ADMIN_PASSWORD", "")
+
+if not admin_password:
+    print("⚠️  ADMIN_PASSWORD não definido. Seed de admin ignorado.")
+    db.close()
+    raise SystemExit(0)
+
+admin_existente = db.query(Usuario).filter(Usuario.email == admin_email).first()
 
 if not admin_existente:
     admin = Usuario(
         nome="Administrador Master",
-        email="admin@escola.com",
-        senha_hash=gerar_hash_senha("admin123"),
-        cargo="ADM"
+        email=admin_email,
+        senha_hash=gerar_hash_senha(admin_password),
+        cargo="ADM",
     )
     db.add(admin)
     db.commit()
-    print("✅ Usuário Admin criado com sucesso!")
-    print("   E-mail: admin@escola.com")
-    print("   Senha:  admin123")
+    print(f"✅ Usuário Admin criado: {admin_email}")
 else:
-    print("ℹ️ O usuário admin@escola.com já existe no banco de dados.")
+    print(f"ℹ️  O usuário {admin_email} já existe no banco de dados.")
 
 db.close()

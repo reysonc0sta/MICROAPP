@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { api } from '../../services/api';
-import { UserPlus, ShieldCheck, CheckCircle, AlertCircle } from 'lucide-react';
+import { api, apiErrorMessage } from '../../services/api';
+import { UserPlus, ShieldCheck, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 export function CadastroUsuario() {
   const [form, setForm] = useState({
     nome: '',
     email: '',
     senha: '',
-    cargo: 'ASSISTENTE'
+    cargo: 'ASSISTENTE',
   });
   const [sucesso, setSucesso] = useState('');
   const [erro, setErro] = useState('');
+  const [carregando, setCarregando] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -20,13 +21,19 @@ export function CadastroUsuario() {
     e.preventDefault();
     setSucesso('');
     setErro('');
+    setCarregando(true);
 
     try {
-      await api.post('/usuarios/cadastrar', form);
+      await api.post('/usuarios/cadastrar', {
+        ...form,
+        email: form.email.trim().toLowerCase(),
+      });
       setSucesso(`Usuário ${form.nome} registrado com sucesso no perfil ${form.cargo}!`);
       setForm({ nome: '', email: '', senha: '', cargo: 'ASSISTENTE' });
     } catch (err) {
-      setErro(err.response?.data?.detail || 'Erro ao cadastrar usuário.');
+      setErro(apiErrorMessage(err, 'Erro ao cadastrar usuário.'));
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -60,6 +67,7 @@ export function CadastroUsuario() {
             value={form.nome}
             onChange={handleChange}
             required
+            disabled={carregando}
             className="field"
             placeholder="Ex: Ana Maria Souza"
           />
@@ -73,6 +81,7 @@ export function CadastroUsuario() {
             value={form.email}
             onChange={handleChange}
             required
+            disabled={carregando}
             className="field"
             placeholder="exemplo@escola.com"
           />
@@ -87,6 +96,7 @@ export function CadastroUsuario() {
             onChange={handleChange}
             required
             minLength={6}
+            disabled={carregando}
             className="field"
             placeholder="******"
           />
@@ -100,6 +110,7 @@ export function CadastroUsuario() {
             name="cargo"
             value={form.cargo}
             onChange={handleChange}
+            disabled={carregando}
             className="field"
           >
             <option value="ASSISTENTE">ASSISTENTE (Envios de WhatsApp / Atendimento)</option>
@@ -110,9 +121,9 @@ export function CadastroUsuario() {
           </select>
         </div>
 
-        <button type="submit" className="btn-primary">
-          <ShieldCheck size={18} />
-          Cadastrar e Liberar Permissão
+        <button type="submit" disabled={carregando} className="btn-primary">
+          {carregando ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+          {carregando ? 'Cadastrando...' : 'Cadastrar e Liberar Permissão'}
         </button>
       </form>
     </div>

@@ -1,37 +1,54 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+
 from app.core.database import get_db
 from app.models.domain import Usuario
 from app.schemas.schemas import UsuarioCreate, UsuarioOut, LoginSchema, TokenSchema
-from app.core.security import gerar_hash_senha, verificar_senha, criar_token_acesso
+from app.core.security import (
+    gerar_hash_senha,
+    verificar_senha,
+    criar_token_acesso,
+    get_current_user,
+    require_cargos,
+)
 
 router = APIRouter()
 
+
 @router.post("/cadastrar", response_model=UsuarioOut)
-def cadastrar_usuario(dados: UsuarioCreate, db: Session = Depends(get_db)):
+def cadastrar_usuario(
+    dados: UsuarioCreate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_cargos("ADM", "DIRETOR")),
+):
     usuario_existente = db.query(Usuario).filter(Usuario.email == dados.email).first()
     if usuario_existente:
         raise HTTPException(status_code=400, detail="E-mail já cadastrado no sistema.")
 
-    cargos_validos = ['DIRETOR', 'PROFESSOR', 'ASSISTENTE', 'ANALISTA', 'ADM']
+    cargos_validos = ["DIRETOR", "PROFESSOR", "ASSISTENTE", "ANALISTA", "ADM"]
     if dados.cargo.upper() not in cargos_validos:
         raise HTTPException(status_code=400, detail=f"Cargo inválido. Escolha entre: {cargos_validos}")
 
+    if len(dados.senha) < 6:
+        raise HTTPException(status_code=400, detail="A senha deve ter no mínimo 6 caracteres.")
+
     novo_usuario = Usuario(
         nome=dados.nome,
-        email=dados.email,
+        email=dados.email.lower().strip(),
         senha_hash=gerar_hash_senha(dados.senha),
-        cargo=dados.cargo.upper()
+        cargo=dados.cargo.upper(),
     )
     db.add(novo_usuario)
     db.commit()
     db.refresh(novo_usuario)
     return novo_usuario
 
+
 @router.post("/login", response_model=TokenSchema)
 def login(dados: LoginSchema, db: Session = Depends(get_db)):
-    usuario = db.query(Usuario).filter(Usuario.email == dados.email).first()
+    email = dados.email.lower().strip()
+    usuario = db.query(Usuario).filter(Usuario.email == email).first()
     if not usuario or not verificar_senha(dados.senha, usuario.senha_hash):
         raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
 
@@ -42,9 +59,18 @@ def login(dados: LoginSchema, db: Session = Depends(get_db)):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "usuario": usuario
+        "usuario": usuario,
     }
 
+
+@router.get("/me", response_model=UsuarioOut)
+def me(usuario: Usuario = Depends(get_current_user)):
+    return usuario
+
+
 @router.get("/", response_model=List[UsuarioOut])
-def listar_usuarios(db: Session = Depends(get_db)):
+def listar_usuarios(
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_cargos("ADM", "DIRETOR")),
+):
     return db.query(Usuario).all()

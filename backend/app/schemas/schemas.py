@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+
 
 class AlunoCreate(BaseModel):
     nome: str
@@ -9,6 +10,7 @@ class AlunoCreate(BaseModel):
     telefone_comercial: Optional[str] = None
     historico_observacoes: Optional[str] = None
 
+
 class AlunoOut(AlunoCreate):
     id: int
     criado_em: datetime
@@ -16,20 +18,24 @@ class AlunoOut(AlunoCreate):
     class Config:
         from_attributes = True
 
+
 class LancarNota(BaseModel):
     aluno_id: int
     materia_id: int
     nota: float
 
+
 class NotificarNota(BaseModel):
     aluno_id: int
     materia_id: int
 
+
 class UsuarioCreate(BaseModel):
-    nome: str
-    email: str
-    senha: str
-    cargo: str  # DIRETOR, PROFESSOR, ASSISTENTE, ANALISTA, ADM
+    nome: str = Field(..., min_length=2, max_length=150)
+    email: str = Field(..., min_length=5, max_length=150)
+    senha: str = Field(..., min_length=6, max_length=128)
+    cargo: str
+
 
 class UsuarioOut(BaseModel):
     id: int
@@ -42,9 +48,11 @@ class UsuarioOut(BaseModel):
     class Config:
         from_attributes = True
 
+
 class LoginSchema(BaseModel):
     email: str
     senha: str
+
 
 class TokenSchema(BaseModel):
     access_token: str

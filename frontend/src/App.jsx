@@ -14,6 +14,7 @@ export default function App() {
   const [usuario, setUsuario] = useState(null);
   const [abaAtiva, setAbaAtiva] = useState('conectar');
   const [menuAberto, setMenuAberto] = useState(false);
+  const [validandoSessao, setValidandoSessao] = useState(true);
   const [whatsappStatus, setWhatsappStatus] = useState(
     localStorage.getItem('whatsapp_status') || 'DISCONNECTED'
   );
@@ -24,11 +25,46 @@ export default function App() {
     localStorage.setItem('whatsapp_status', status);
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+    localStorage.removeItem('whatsapp_status');
+    setWhatsappStatus('DISCONNECTED');
+    setUsuario(null);
+    setMenuAberto(false);
+  };
+
   useEffect(() => {
-    const usuarioSalvo = localStorage.getItem('usuario');
-    if (usuarioSalvo) {
-      setUsuario(JSON.parse(usuarioSalvo));
-    }
+    const onAuthLogout = () => handleLogout();
+    window.addEventListener('auth:logout', onAuthLogout);
+    return () => window.removeEventListener('auth:logout', onAuthLogout);
+  }, []);
+
+  useEffect(() => {
+    const restaurarSessao = async () => {
+      const token = localStorage.getItem('token');
+      const raw = localStorage.getItem('usuario');
+
+      if (!token || !raw) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('usuario');
+        setValidandoSessao(false);
+        return;
+      }
+
+      try {
+        JSON.parse(raw);
+        const { data } = await api.get('/usuarios/me');
+        localStorage.setItem('usuario', JSON.stringify(data));
+        setUsuario(data);
+      } catch {
+        handleLogout();
+      } finally {
+        setValidandoSessao(false);
+      }
+    };
+
+    restaurarSessao();
   }, []);
 
   useEffect(() => {
@@ -57,12 +93,13 @@ export default function App() {
     };
   }, [usuario]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('usuario');
-    setUsuario(null);
-    setMenuAberto(false);
-  };
+  if (validandoSessao) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-navy-50 text-sm text-navy-600 dark:bg-navy-950 dark:text-navy-300">
+        Validando sessão...
+      </div>
+    );
+  }
 
   if (!usuario) {
     return <Login onLoginSuccess={(u) => setUsuario(u)} />;
@@ -158,10 +195,6 @@ export default function App() {
             <button type="button" onClick={() => irPara('conectar')} className={`${classeAba('conectar')} w-full`}>
               <QrCode size={16} />
               Conectar WhatsApp
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${whatsappConectado ? 'bg-emerald-400' : 'bg-amber-400'}`}
-                title={whatsappConectado ? 'Conectado' : 'Desconectado'}
-              />
             </button>
 
             <button type="button" onClick={() => irPara('planilha')} className={`${classeAba('planilha')} w-full`}>
