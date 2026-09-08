@@ -162,7 +162,7 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
   };
 
   return (
-    <div className="card mx-auto max-w-3xl notranslate">
+    <div className="card notranslate w-full">
       <h2 className="mb-2 flex items-center gap-2 text-xl font-bold text-navy-900 dark:text-white">
         <Bell className="text-navy-600 dark:text-navy-300" />
         Disparar Lembretes
