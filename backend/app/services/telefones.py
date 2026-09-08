@@ -1,22 +1,48 @@
 import re
 
+
 def limpar_telefone(numero: str | None) -> str | None:
+    """Normaliza para E.164 BR (55 + DDD + número). Retorna None se inválido."""
     if not numero:
         return None
-    num_limpo = re.sub(r'\D', '', str(numero))
-    if not num_limpo:
+
+    digitos = re.sub(r"\D", "", str(numero))
+    if not digitos:
         return None
-    if len(num_limpo) in [10, 11]:
-        num_limpo = "55" + num_limpo
-    return num_limpo
+
+    # Remove zero inicial de tronco (ex.: 0119...)
+    if digitos.startswith("0") and len(digitos) in (11, 12):
+        digitos = digitos.lstrip("0")
+
+    if digitos.startswith("55") and len(digitos) in (12, 13):
+        return digitos
+
+    if len(digitos) in (10, 11):
+        return "55" + digitos
+
+    return None
+
 
 def obter_telefone_envio(telefone_pessoal: str | None, telefone_comercial: str | None) -> dict:
+    """Compat: retorna o primeiro canal disponível (preview)."""
+    candidatos = candidatos_envio(telefone_pessoal, telefone_comercial)
+    if not candidatos:
+        return {"numero": None, "canal": "PESSOAL", "usou_fallback": False}
+    return candidatos[0]
+
+
+def candidatos_envio(telefone_pessoal: str | None, telefone_comercial: str | None) -> list[dict]:
+    """Lista ordenada pessoal → comercial para retry em caso de falha no envio."""
     pessoal = limpar_telefone(telefone_pessoal)
     comercial = limpar_telefone(telefone_comercial)
+    out: list[dict] = []
 
     if pessoal:
-        return {"numero": pessoal, "canal": "PESSOAL", "usou_fallback": False}
-    if comercial:
-        return {"numero": comercial, "canal": "COMERCIAL", "usou_fallback": True}
-
-    return {"numero": None, "canal": "PESSOAL", "usou_fallback": False}
+        out.append({"numero": pessoal, "canal": "PESSOAL", "usou_fallback": False})
+    if comercial and comercial != pessoal:
+        out.append({
+            "numero": comercial,
+            "canal": "COMERCIAL",
+            "usou_fallback": bool(pessoal),
+        })
+    return out

@@ -1,8 +1,10 @@
 import pandas as pd
 from datetime import datetime
 from sqlalchemy.orm import Session
-from app.services.telefones import obter_telefone_envio
+
+from app.services.telefones import candidatos_envio, obter_telefone_envio
 from app.services.whatsapp_service import disparar_mensagem_real
+from app.services.historico_service import registrar_envio_whatsapp
 from app.services.config_service import (
     TEMPLATE_PADRAO,
     obter_template_mensagem,
@@ -17,21 +19,20 @@ def montar_candidatos_disparo(caminho_arquivo: str, template: str = TEMPLATE_PAD
     disparo real, para garantir que os dois mostrem exatamente a mesma coisa.
     """
     df = pd.read_excel(caminho_arquivo)
-    df = df.dropna(subset=['Nome Aluno'])
+    df = df.dropna(subset=["Nome Aluno"])
 
-    if 'Status Contrato' in df.columns:
-        df = df[df['Status Contrato'] == 'Ativo']
+    if "Status Contrato" in df.columns:
+        df = df[df["Status Contrato"] == "Ativo"]
 
-    com_faltas = df[df['Faltas'] > 0]
-
+    com_faltas = df[df["Faltas"] > 0]
     candidatos = []
 
     for _, row in com_faltas.iterrows():
-        nome = str(row['Nome Aluno']).strip()
-        faltas = int(row['Faltas'])
-        tel_aluno = row.get('Telefone Aluno')
-        tel_resp = row.get('Telefone Responsável')
-
+        nome = str(row["Nome Aluno"]).strip()
+        faltas = int(row["Faltas"])
+        tel_aluno = row.get("Telefone Aluno")
+        tel_resp = row.get("Telefone Responsável")
+        canais = candidatos_envio(tel_aluno, tel_resp)
         contato = obter_telefone_envio(tel_aluno, tel_resp)
 
         candidatos.append({
@@ -40,9 +41,12 @@ def montar_candidatos_disparo(caminho_arquivo: str, template: str = TEMPLATE_PAD
             "numero": contato["numero"],
             "canal": contato["canal"] if contato["numero"] else None,
             "usou_fallback": contato["usou_fallback"],
-            "valido": bool(contato["numero"]),
-            "motivo_invalido": None if contato["numero"] else "Sem telefone válido cadastrado",
-            "mensagem": renderizar_mensagem(template, nome, faltas) if contato["numero"] else None,
+            "canais": canais,
+            "tel_aluno": tel_aluno,
+            "tel_resp": tel_resp,
+            "valido": bool(canais),
+            "motivo_invalido": None if canais else "Sem telefone válido cadastrado",
+            "mensagem": renderizar_mensagem(template, nome, faltas) if canais else None,
         })
 
     return candidatos
@@ -62,31 +66,68 @@ def preview_disparos_faltas_excel(caminho_arquivo: str, template: str = TEMPLATE
     }
 
 
-def processar_disparos_faltas_excel(caminho_arquivo: str, db: Session):
+def processar_disparos_faltas_excel(caminho_arquivo: str, db: Session) -> dict:
     """
-    Lê a planilha de controle, filtra contratos ativos com faltas > 0,
-    e envia o alerta de reposição (com o template configurado) para cada
-    candidato com telefone válido.
+    Lê a planilha, envia alertas com fallback pessoal→comercial e grava histórico.
     """
     template = obter_template_mensagem(db)
     candidatos = montar_candidatos_disparo(caminho_arquivo, template)
     resultados_envio = []
+    total_sucesso = 0
+    total_falha = 0
 
     for candidato in candidatos:
         if not candidato["valido"]:
             continue
 
-        enviado = disparar_mensagem_real(candidato["numero"], candidato["mensagem"])
+        canais = candidato.get("canais") or candidatos_envio(
+            candidato.get("tel_aluno"), candidato.get("tel_resp")
+        )
+        enviado = False
+        canal_usado = None
+        numero_usado = None
+        usou_fallback = False
+
+        for canal in canais:
+            if disparar_mensagem_real(canal["numero"], candidato["mensagem"]):
+                enviado = True
+                canal_usado = canal["canal"]
+                numero_usado = canal["numero"]
+                usou_fallback = canal["usou_fallback"]
+                break
+            canal_usado = canal["canal"]
+            numero_usado = canal["numero"]
+            usou_fallback = canal["usou_fallback"]
+
+        status = "SUCESSO" if enviado else "FALHA_AMBOS"
+        if enviado:
+            total_sucesso += 1
+        else:
+            total_falha += 1
+
+        registrar_envio_whatsapp(
+            db,
+            numero=numero_usado or "",
+            canal=canal_usado or "PESSOAL",
+            usou_fallback=usou_fallback,
+            texto=candidato["mensagem"],
+            status_final=status,
+            nome_destino=candidato["nome"],
+        )
+
         resultados_envio.append({
             "nome": candidato["nome"],
-            "numero": candidato["numero"],
-            "canal": candidato["canal"],
-            "status": "ENVIADO" if enviado else "FALHA",
+            "numero": numero_usado,
+            "canal": canal_usado,
+            "usou_fallback": usou_fallback,
+            "status": status,
             "respondido": False,
-            "horario_envio": datetime.now()
+            "horario_envio": datetime.now(),
         })
 
     return {
         "total_disparados": len(resultados_envio),
-        "detalhes": resultados_envio
+        "total_sucesso": total_sucesso,
+        "total_falha": total_falha,
+        "detalhes": resultados_envio,
     }

@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
+
 from app.core.database import get_db
+from app.core.security import get_current_user, require_cargos
+from app.models.domain import Usuario
 from app.services.config_service import (
     obter_configuracao,
     atualizar_template_mensagem,
@@ -47,13 +50,20 @@ def _montar_saida_lembrete(template: str) -> TemplateMensagemOut:
 
 
 @router.get("/mensagem", response_model=TemplateMensagemOut)
-def obter_mensagem(db: Session = Depends(get_db)):
+def obter_mensagem(
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
+):
     config = obter_configuracao(db)
     return _montar_saida(config.template)
 
 
 @router.put("/mensagem", response_model=TemplateMensagemOut)
-def atualizar_mensagem(dados: TemplateMensagemIn, db: Session = Depends(get_db)):
+def atualizar_mensagem(
+    dados: TemplateMensagemIn,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_cargos("ADM", "DIRETOR", "ASSISTENTE")),
+):
     if "{nome}" not in dados.template:
         raise HTTPException(
             status_code=400,
@@ -73,13 +83,20 @@ def atualizar_mensagem(dados: TemplateMensagemIn, db: Session = Depends(get_db))
 
 
 @router.get("/mensagem-lembrete", response_model=TemplateMensagemOut)
-def obter_mensagem_lembrete(db: Session = Depends(get_db)):
+def obter_mensagem_lembrete(
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
+):
     config = obter_configuracao(db)
     return _montar_saida_lembrete(config.template_lembrete or "")
 
 
 @router.put("/mensagem-lembrete", response_model=TemplateMensagemOut)
-def atualizar_mensagem_lembrete(dados: TemplateMensagemIn, db: Session = Depends(get_db)):
+def atualizar_mensagem_lembrete(
+    dados: TemplateMensagemIn,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_cargos("ADM", "DIRETOR", "ASSISTENTE")),
+):
     if "{nome}" not in dados.template:
         raise HTTPException(
             status_code=400,

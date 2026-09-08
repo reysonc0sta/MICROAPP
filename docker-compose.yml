@@ -3,10 +3,12 @@ services:
     image: postgres:15-alpine
     container_name: microapp_postgres
     restart: always
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: root
-      POSTGRES_DB: hub_escola
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root}
+      POSTGRES_DB: ${POSTGRES_DB:-hub_escola}
     ports:
       - "5432:5432"
     volumes:
@@ -14,27 +16,35 @@ services:
       - ./docker/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
     networks:
       - microapp_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-hub_escola}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   evolution_api:
     image: evoapicloud/evolution-api:v2.1.1
     container_name: microapp_evolution
     restart: always
+    env_file:
+      - .env
     ports:
       - "8080:8080"
     environment:
       - SERVER_URL=http://localhost:8080
       - AUTHENTICATION_TYPE=apikey
-      - AUTHENTICATION_API_KEY=42d713280036
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://postgres:root@db:5432/evolution_db?schema=public
+      - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-root}@db:5432/evolution_db?schema=public
       - DATABASE_CONNECTION_CLIENT_NAME=microapp_evolution
       - CACHE_REDIS_ENABLED=false
       - CONFIG_SESSION_PHONE_CLIENT=Chrome
       - CONFIG_SESSION_PHONE_NAME=Chrome
       - QRCODE_LIMIT=30
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - evolution_instances:/evolution/instances
     networks:
@@ -44,16 +54,24 @@ services:
     build: ./backend
     container_name: microapp_backend
     restart: always
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:root@db:5432/hub_escola
-      - SECRET_KEY=09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-root}@db:5432/${POSTGRES_DB:-hub_escola}
+      - SECRET_KEY=${SECRET_KEY}
       - EVOLUTION_API_URL=http://evolution_api:8080
-      - EVOLUTION_API_KEY=42d713280036
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - EVOLUTION_INSTANCE_NAME=${EVOLUTION_INSTANCE_NAME:-hub_escola}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@escola.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     depends_on:
-      - db
-      - evolution_api
+      db:
+        condition: service_healthy
+      evolution_api:
+        condition: service_started
     networks:
       - microapp_net
 
@@ -64,7 +82,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_URL=http://localhost:8000/api/v1
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000/api/v1}
     volumes:
       - ./frontend:/app
       - /app/node_modules

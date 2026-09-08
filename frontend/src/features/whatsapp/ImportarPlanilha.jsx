@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { api } from '../../services/api';
+import { api, apiErrorMessage } from '../../services/api';
 import {
   Upload,
   FileSpreadsheet,
@@ -19,11 +19,13 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
   const [carregando, setCarregando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState('');
+  const [inputKey, setInputKey] = useState(0);
 
   const limparEstadoArquivo = () => {
     setArquivo(null);
     setPreview(null);
     setResultado(null);
+    setInputKey((k) => k + 1);
   };
 
   const carregarPreview = async (file) => {
@@ -41,7 +43,7 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
       });
       setPreview(response.data);
     } catch (err) {
-      setErro(err.response?.data?.detail || 'Erro ao ler a planilha para pré-visualização.');
+      setErro(apiErrorMessage(err, 'Erro ao ler a planilha para pré-visualização.'));
       setArquivo(null);
     } finally {
       setCarregandoPreview(false);
@@ -94,7 +96,7 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
       });
       setResultado(response.data);
     } catch (err) {
-      setErro(err.response?.data?.detail || 'Erro ao processar a planilha.');
+      setErro(apiErrorMessage(err, 'Erro ao processar a planilha.'));
     } finally {
       setCarregando(false);
     }
@@ -136,10 +138,11 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
         }`}
       >
         <input
+          key={inputKey}
           type="file"
           accept=".xlsx, .xls"
           onChange={handleFileChange}
-          disabled={!whatsappConectado || carregandoPreview}
+          disabled={!whatsappConectado || carregandoPreview || carregando}
           className="absolute inset-0 h-full w-full opacity-0 disabled:cursor-not-allowed"
         />
         <Upload className="mx-auto mb-3 h-12 w-12 text-navy-400" />
@@ -239,8 +242,15 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
             <span>{resultado.mensagem}</span>
           </div>
           <p className="text-xs text-emerald-700 dark:text-emerald-400">
-            Arquivo: <strong>{resultado.nome_arquivo}</strong> | Mensagens disparadas:{' '}
-            <strong>{resultado.total_registros_identificados}</strong>
+            Arquivo: <strong>{resultado.nome_arquivo}</strong>
+            {resultado.status === 'PROCESSANDO' ? (
+              <> | Status: <strong>em segundo plano</strong> (histórico gravado no banco)</>
+            ) : (
+              <>
+                {' '}
+                | Mensagens: <strong>{resultado.total_registros_identificados}</strong>
+              </>
+            )}
           </p>
         </div>
       ) : null}

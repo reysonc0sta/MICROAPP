@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { api } from '../../services/api';
+import { api, apiErrorMessage } from '../../services/api';
 import { QrCode, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { statusWhatsappConectado } from './statusWhatsapp';
 
@@ -47,7 +47,7 @@ export function ConectarWhatsapp({ onStatusChange }) {
       const response = await api.get('/whatsapp/conectar', { params: { forcar } });
       aplicarResposta(response.data);
     } catch (err) {
-      setErro(err.response?.data?.detail || 'Erro ao conectar com a Evolution API.');
+      setErro(apiErrorMessage(err, 'Erro ao conectar com a Evolution API.'));
       informarStatus(false);
     } finally {
       setLoading(false);

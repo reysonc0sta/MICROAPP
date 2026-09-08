@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../../services/api';
+import { api, apiErrorMessage } from '../../services/api';
 import { MessageSquareText, CheckCircle, AlertCircle, Loader2, Save, Eye } from 'lucide-react';
 
 export function EditarMensagem() {
@@ -17,7 +17,7 @@ export function EditarMensagem() {
         setTemplate(data.template);
         setExemplo(data.exemplo_renderizado);
       } catch (err) {
-        setErro(err.response?.data?.detail || 'Erro ao carregar a mensagem atual.');
+        setErro(apiErrorMessage(err, 'Erro ao carregar a mensagem atual.'));
       } finally {
         setCarregandoInicial(false);
       }
@@ -35,7 +35,7 @@ export function EditarMensagem() {
       setExemplo(data.exemplo_renderizado);
       setSucesso(true);
     } catch (err) {
-      setErro(err.response?.data?.detail || 'Erro ao salvar a mensagem.');
+      setErro(apiErrorMessage(err, 'Erro ao salvar a mensagem.'));
     } finally {
       setSalvando(false);
     }

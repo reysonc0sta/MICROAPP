@@ -3,19 +3,20 @@ from sqlalchemy import Column, Integer, String, Enum, Numeric, DateTime, Foreign
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
+
 class Aluno(Base):
     __tablename__ = "alunos"
 
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(150), nullable=False, index=True)
-    turno = Column(Enum('MATUTINO', 'VESPERTINO', 'NOTURNO', 'INTEGRAL', name='turno_enum'), nullable=False)
+    turno = Column(Enum("MATUTINO", "VESPERTINO", "NOTURNO", "INTEGRAL", name="turno_enum"), nullable=False)
     telefone_pessoal = Column(String(20), nullable=True)
     telefone_comercial = Column(String(20), nullable=True)
     historico_observacoes = Column(Text, nullable=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
 
-    materias = relationship("AlunoMateria", back_populates="aluno")
-    provas = relationship("ProvaResultado", back_populates="aluno")
+    materias = relationship("AlunoMateria", back_populates="aluno", cascade="all, delete-orphan")
+    provas = relationship("ProvaResultado", back_populates="aluno", cascade="all, delete-orphan")
     mensagens = relationship("HistoricoWhatsApp", back_populates="aluno")
 
 
@@ -30,8 +31,8 @@ class AlunoMateria(Base):
     __tablename__ = "aluno_materias"
 
     id = Column(Integer, primary_key=True)
-    aluno_id = Column(Integer, ForeignKey("alunos.id"), nullable=False)
-    materia_id = Column(Integer, ForeignKey("materias.id"), nullable=False)
+    aluno_id = Column(Integer, ForeignKey("alunos.id", ondelete="CASCADE"), nullable=False, index=True)
+    materia_id = Column(Integer, ForeignKey("materias.id", ondelete="CASCADE"), nullable=False, index=True)
 
     aluno = relationship("Aluno", back_populates="materias")
     materia = relationship("Materia")
@@ -41,8 +42,8 @@ class ProvaResultado(Base):
     __tablename__ = "provas_resultados"
 
     id = Column(Integer, primary_key=True)
-    aluno_id = Column(Integer, ForeignKey("alunos.id"), nullable=False)
-    materia_id = Column(Integer, ForeignKey("materias.id"), nullable=False)
+    aluno_id = Column(Integer, ForeignKey("alunos.id", ondelete="CASCADE"), nullable=False, index=True)
+    materia_id = Column(Integer, ForeignKey("materias.id", ondelete="CASCADE"), nullable=False, index=True)
     nota = Column(Numeric(4, 2), nullable=False)
     tentativa = Column(Integer, nullable=False, default=1)
     data_realizacao = Column(DateTime, default=datetime.utcnow)
@@ -55,13 +56,18 @@ class HistoricoWhatsApp(Base):
     __tablename__ = "historico_mensagens"
 
     id = Column(Integer, primary_key=True)
-    aluno_id = Column(Integer, ForeignKey("alunos.id"), nullable=False)
-    numero_destino = Column(String(20), nullable=False)
-    canal_utilizado = Column(Enum('PESSOAL', 'COMERCIAL', name='canal_enum'), nullable=False)
+    aluno_id = Column(Integer, ForeignKey("alunos.id", ondelete="SET NULL"), nullable=True, index=True)
+    nome_destino = Column(String(150), nullable=True, index=True)
+    numero_destino = Column(String(20), nullable=False, index=True)
+    canal_utilizado = Column(Enum("PESSOAL", "COMERCIAL", name="canal_enum"), nullable=False)
     usou_fallback = Column(Boolean, default=False)
     conteudo = Column(Text, nullable=False)
-    status_final = Column(Enum('PENDENTE', 'SUCESSO', 'FALHA_AMBOS', name='status_final_enum'), default='PENDENTE')
-    enviado_em = Column(DateTime, default=datetime.utcnow)
+    status_final = Column(
+        Enum("PENDENTE", "SUCESSO", "FALHA_AMBOS", name="status_final_enum"),
+        default="PENDENTE",
+        index=True,
+    )
+    enviado_em = Column(DateTime, default=datetime.utcnow, index=True)
 
     aluno = relationship("Aluno", back_populates="mensagens")
 
@@ -83,9 +89,9 @@ class Usuario(Base):
     email = Column(String(150), unique=True, index=True, nullable=False)
     senha_hash = Column(String(255), nullable=False)
     cargo = Column(
-        Enum('DIRETOR', 'PROFESSOR', 'ASSISTENTE', 'ANALISTA', 'ADM', name='cargo_enum'),
+        Enum("DIRETOR", "PROFESSOR", "ASSISTENTE", "ANALISTA", "ADM", name="cargo_enum"),
         nullable=False,
-        default='ASSISTENTE'
+        default="ASSISTENTE",
     )
     ativo = Column(Boolean, default=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
