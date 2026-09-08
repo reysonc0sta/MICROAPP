@@ -71,6 +71,7 @@ class ConfiguracaoMensagem(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     template = Column(Text, nullable=False)
+    template_lembrete = Column(Text, nullable=True)
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 

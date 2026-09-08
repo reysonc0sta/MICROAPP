@@ -198,7 +198,7 @@ def conectar_whatsapp(forcar_novo: bool = False) -> dict:
 
 
 def disparar_mensagem_real(numero: str, texto: str) -> bool:
-    """Envia uma mensagem de texto via Evolution API."""
+    """Envia uma mensagem de texto via Evolution API (POST /message/sendText/hub_escola)."""
     url = f"{EVOLUTION_URL}/message/sendText/{INSTANCE_NAME}"
     payload = {
         "number": numero,
@@ -212,8 +212,19 @@ def disparar_mensagem_real(numero: str, texto: str) -> bool:
         },
     }
     try:
-        response = requests.post(url, json=payload, headers=_headers(), timeout=15)
+        response = requests.post(
+            url,
+            json=payload,
+            headers={"apikey": API_KEY, "Content-Type": "application/json"},
+            timeout=15,
+        )
         return response.status_code in (200, 201)
-    except Exception as exc:
+    except requests.Timeout as exc:
+        print(f"[ERRO EVOLUTION] Timeout (15s) ao enviar para {numero}: {exc}")
+        return False
+    except requests.RequestException as exc:
         print(f"[ERRO EVOLUTION] Falha ao enviar para {numero}: {exc}")
+        return False
+    except Exception as exc:
+        print(f"[ERRO EVOLUTION] Erro inesperado ao enviar para {numero}: {exc}")
         return False
