@@ -37,6 +37,20 @@ class UsuarioCreate(BaseModel):
     cargo: str
 
 
+class UsuarioUpdate(BaseModel):
+    nome: Optional[str] = Field(None, min_length=2, max_length=150)
+    email: Optional[str] = Field(None, min_length=5, max_length=150)
+    cargo: Optional[str] = None
+
+
+class UsuarioAtivoUpdate(BaseModel):
+    ativo: bool
+
+
+class RedefinirSenha(BaseModel):
+    nova_senha: str = Field(..., min_length=6, max_length=128)
+
+
 class UsuarioOut(BaseModel):
     id: int
     nome: str

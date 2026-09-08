@@ -1,5 +1,6 @@
 import base64
 import io
+import re
 import time
 
 import qrcode
@@ -7,14 +8,20 @@ import requests
 from fastapi import HTTPException
 
 from app.core.config import settings
+from app.models.domain import Usuario
 
 EVOLUTION_URL = settings.EVOLUTION_API_URL.rstrip("/")
 API_KEY = settings.EVOLUTION_API_KEY
-INSTANCE_NAME = settings.EVOLUTION_INSTANCE_NAME
 
 MENSAGEM_DESCONECTADO = (
     "WhatsApp desconectado. Conecte o aparelho pelo QR Code antes de enviar planilhas ou disparar mensagens."
 )
+
+
+def nome_instancia_usuario(usuario: Usuario | int) -> str:
+    """Cada login tem sua própria instância Evolution (número WhatsApp isolado)."""
+    usuario_id = usuario if isinstance(usuario, int) else usuario.id
+    return f"user_{int(usuario_id)}"
 
 
 def _headers() -> dict:
@@ -62,10 +69,10 @@ def _extrair_estado(payload: dict) -> str:
     return "close"
 
 
-def obter_estado_conexao() -> str:
+def obter_estado_conexao(instance_name: str) -> str:
     try:
         response = requests.get(
-            f"{EVOLUTION_URL}/instance/connectionState/{INSTANCE_NAME}",
+            f"{EVOLUTION_URL}/instance/connectionState/{instance_name}",
             headers=_headers(),
             timeout=15,
         )
@@ -76,12 +83,12 @@ def obter_estado_conexao() -> str:
         return "error"
 
 
-def whatsapp_esta_conectado() -> bool:
-    return obter_estado_conexao() in {"open", "connected"}
+def whatsapp_esta_conectado(instance_name: str) -> bool:
+    return obter_estado_conexao(instance_name) in {"open", "connected"}
 
 
-def exigir_whatsapp_conectado() -> None:
-    if not whatsapp_esta_conectado():
+def exigir_whatsapp_conectado(instance_name: str) -> None:
+    if not whatsapp_esta_conectado(instance_name):
         raise HTTPException(status_code=409, detail=MENSAGEM_DESCONECTADO)
 
 
@@ -96,7 +103,7 @@ def _nome_instancia(item: dict) -> str:
     )
 
 
-def _instancia_existe() -> bool:
+def _instancia_existe(instance_name: str) -> bool:
     try:
         response = requests.get(
             f"{EVOLUTION_URL}/instance/fetchInstances",
@@ -109,17 +116,17 @@ def _instancia_existe() -> bool:
         itens = dados if isinstance(dados, list) else dados.get("value") if isinstance(dados, dict) else []
         if not isinstance(itens, list):
             return False
-        return any(_nome_instancia(item) == INSTANCE_NAME for item in itens if isinstance(item, dict))
+        return any(_nome_instancia(item) == instance_name for item in itens if isinstance(item, dict))
     except requests.RequestException:
         return False
 
 
-def _criar_instancia() -> dict:
+def _criar_instancia(instance_name: str) -> dict:
     response = requests.post(
         f"{EVOLUTION_URL}/instance/create",
         headers=_headers(),
         json={
-            "instanceName": INSTANCE_NAME,
+            "instanceName": instance_name,
             "qrcode": True,
             "integration": "WHATSAPP-BAILEYS",
         },
@@ -134,10 +141,10 @@ def _criar_instancia() -> dict:
     )
 
 
-def _logout_instancia() -> None:
+def _logout_instancia(instance_name: str) -> None:
     try:
         requests.delete(
-            f"{EVOLUTION_URL}/instance/logout/{INSTANCE_NAME}",
+            f"{EVOLUTION_URL}/instance/logout/{instance_name}",
             headers=_headers(),
             timeout=20,
         )
@@ -145,17 +152,17 @@ def _logout_instancia() -> None:
         pass
 
 
-def _apagar_instancia() -> None:
+def _apagar_instancia(instance_name: str) -> None:
     try:
         requests.delete(
-            f"{EVOLUTION_URL}/instance/delete/{INSTANCE_NAME}",
+            f"{EVOLUTION_URL}/instance/delete/{instance_name}",
             headers=_headers(),
             timeout=20,
         )
     except requests.RequestException:
         pass
     for _ in range(10):
-        if not _instancia_existe():
+        if not _instancia_existe(instance_name):
             return
         time.sleep(0.4)
 
@@ -214,9 +221,9 @@ def _extrair_qr(payload: dict) -> str | None:
     return None
 
 
-def _obter_qr_atual() -> tuple[dict, str | None]:
+def _obter_qr_atual(instance_name: str) -> tuple[dict, str | None]:
     response = requests.get(
-        f"{EVOLUTION_URL}/instance/connect/{INSTANCE_NAME}",
+        f"{EVOLUTION_URL}/instance/connect/{instance_name}",
         headers=_headers(),
         timeout=25,
     )
@@ -229,7 +236,7 @@ def _obter_qr_atual() -> tuple[dict, str | None]:
     return dados, _extrair_qr(dados)
 
 
-def _aguardar_qr(qr_inicial: str | None = None) -> tuple[dict, str | None]:
+def _aguardar_qr(instance_name: str, qr_inicial: str | None = None) -> tuple[dict, str | None]:
     if qr_inicial:
         return {}, qr_inicial
 
@@ -238,7 +245,7 @@ def _aguardar_qr(qr_inicial: str | None = None) -> tuple[dict, str | None]:
     ultimo_erro: Exception | None = None
     for _ in range(8):
         try:
-            dados, qr = _obter_qr_atual()
+            dados, qr = _obter_qr_atual(instance_name)
         except HTTPException as exc:
             ultimo_erro = exc
             time.sleep(1.5)
@@ -250,7 +257,7 @@ def _aguardar_qr(qr_inicial: str | None = None) -> tuple[dict, str | None]:
 
         if qr:
             return dados, qr
-        if obter_estado_conexao() in {"open", "connected"}:
+        if obter_estado_conexao(instance_name) in {"open", "connected"}:
             return dados, None
         time.sleep(1.5)
 
@@ -263,8 +270,11 @@ def _aguardar_qr(qr_inicial: str | None = None) -> tuple[dict, str | None]:
     return dados, qr
 
 
-def conectar_whatsapp(forcar_novo: bool = False) -> dict:
-    estado = obter_estado_conexao()
+def conectar_whatsapp(instance_name: str, forcar_novo: bool = False) -> dict:
+    # Sanitiza nome (Evolution costuma rejeitar caracteres especiais)
+    instance_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", instance_name)
+
+    estado = obter_estado_conexao(instance_name)
     if estado == "error":
         raise HTTPException(
             status_code=502,
@@ -274,48 +284,54 @@ def conectar_whatsapp(forcar_novo: bool = False) -> dict:
     if estado in {"open", "connected"} and not forcar_novo:
         return {
             "state": "open",
-            "instance": {"state": "open"},
+            "instance": {"state": "open", "instanceName": instance_name},
             "qrcode": None,
             "base64": None,
+            "instanceName": instance_name,
         }
 
     qr_criacao = None
     if forcar_novo:
-        _logout_instancia()
-        _apagar_instancia()
-        criado = _criar_instancia()
+        _logout_instancia(instance_name)
+        _apagar_instancia(instance_name)
+        criado = _criar_instancia(instance_name)
         qr_criacao = _extrair_qr(criado)
-    elif not _instancia_existe():
-        criado = _criar_instancia()
+    elif not _instancia_existe(instance_name):
+        criado = _criar_instancia(instance_name)
         qr_criacao = _extrair_qr(criado)
 
     try:
-        dados, qr = _aguardar_qr(qr_criacao)
+        dados, qr = _aguardar_qr(instance_name, qr_criacao)
     except requests.RequestException as exc:
         raise HTTPException(status_code=502, detail=f"Falha ao obter QR Code: {exc}") from exc
 
-    estado_atual = obter_estado_conexao()
+    estado_atual = obter_estado_conexao(instance_name)
     if estado_atual in {"open", "connected"}:
         return {
             "state": "open",
-            "instance": {"state": "open"},
+            "instance": {"state": "open", "instanceName": instance_name},
             "qrcode": None,
             "base64": None,
+            "instanceName": instance_name,
         }
 
     pairing = _extrair_pairing(dados) if isinstance(dados, dict) else None
     return {
         "state": estado_atual if estado_atual not in {"error"} else "close",
-        "instance": {"state": estado_atual if estado_atual not in {"error"} else "close"},
+        "instance": {
+            "state": estado_atual if estado_atual not in {"error"} else "close",
+            "instanceName": instance_name,
+        },
         "qrcode": {"base64": qr} if qr else None,
         "base64": qr,
         "pairingCode": pairing,
+        "instanceName": instance_name,
     }
 
 
-def disparar_mensagem_real(numero: str, texto: str) -> bool:
+def disparar_mensagem_real(numero: str, texto: str, instance_name: str) -> bool:
     """Envia uma mensagem de texto via Evolution API (POST /message/sendText/{instance})."""
-    url = f"{EVOLUTION_URL}/message/sendText/{INSTANCE_NAME}"
+    url = f"{EVOLUTION_URL}/message/sendText/{instance_name}"
     payload = {
         "number": numero,
         "text": texto,

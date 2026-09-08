@@ -10,6 +10,12 @@ from app.services.config_service import (
     obter_template_lembrete,
     renderizar_mensagem_lembrete,
 )
+from app.services.planilha_io import (
+    COLUNAS_OBRIGATORIAS_LEMBRETES,
+    celula_texto,
+    ler_planilha_excel,
+    validar_colunas,
+)
 
 TURNOS_VALIDOS = {"MANHA", "TARDE", "NOITE", "TODOS"}
 
@@ -53,7 +59,8 @@ def montar_candidatos_lembrete(
     template: str = TEMPLATE_LEMBRETE_PADRAO,
 ) -> list[dict]:
     turno_filtro = validar_turno(turno)
-    df = pd.read_excel(caminho_arquivo)
+    df = ler_planilha_excel(caminho_arquivo)
+    validar_colunas(df, COLUNAS_OBRIGATORIAS_LEMBRETES)
     df = df.dropna(subset=["Nome Aluno"])
 
     if "Status Contrato" in df.columns:
@@ -62,22 +69,22 @@ def montar_candidatos_lembrete(
     candidatos = []
 
     for _, row in df.iterrows():
-        nome = str(row["Nome Aluno"]).strip()
+        nome = celula_texto(row["Nome Aluno"])
+        if not nome:
+            continue
         turno_bruto = row.get("Turno")
         turno_norm = normalizar_turno(turno_bruto)
 
         if turno_filtro != "TODOS" and turno_norm != turno_filtro:
             continue
 
-        tel_aluno = row.get("Telefone Aluno")
-        tel_resp = row.get("Telefone Responsável")
+        tel_aluno = celula_texto(row.get("Telefone Aluno"))
+        tel_resp = celula_texto(row.get("Telefone Responsável"))
         canais = candidatos_envio(tel_aluno, tel_resp)
         contato = obter_telefone_envio(tel_aluno, tel_resp)
         turno_label = ROTULO_TURNO.get(
             turno_norm,
-            str(turno_bruto).strip()
-            if turno_bruto is not None and not pd.isna(turno_bruto)
-            else "—",
+            celula_texto(turno_bruto) or "—",
         )
 
         candidatos.append({
@@ -118,7 +125,15 @@ def preview_lembretes_excel(
     }
 
 
-def processar_lembretes_excel(caminho_arquivo: str, db: Session, turno: str = "TODOS") -> dict:
+def processar_lembretes_excel(
+    caminho_arquivo: str,
+    db: Session,
+    turno: str = "TODOS",
+    instance_name: str | None = None,
+) -> dict:
+    if not instance_name:
+        raise ValueError("Instância WhatsApp do usuário não informada.")
+
     template = obter_template_lembrete(db)
     candidatos = montar_candidatos_lembrete(caminho_arquivo, turno, template)
     resultados_envio = []
@@ -138,7 +153,7 @@ def processar_lembretes_excel(caminho_arquivo: str, db: Session, turno: str = "T
         usou_fallback = False
 
         for canal in canais:
-            if disparar_mensagem_real(canal["numero"], candidato["mensagem"]):
+            if disparar_mensagem_real(canal["numero"], candidato["mensagem"], instance_name):
                 enviado = True
                 canal_usado = canal["canal"]
                 numero_usado = canal["numero"]

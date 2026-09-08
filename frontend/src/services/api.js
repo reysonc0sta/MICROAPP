@@ -1,9 +1,15 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_URL;
-if (!baseURL) {
-  console.error('VITE_API_URL não está definido. Configure no .env ou no docker-compose.');
+/** Usa o mesmo host da página (localhost ou IP da rede) para a API funcionar na LAN. */
+function resolveApiBaseUrl() {
+  const fromEnv = import.meta.env.VITE_API_URL;
+  const host = window.location.hostname;
+  const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+  if (fromEnv && isLocalHost) return fromEnv;
+  return `${window.location.protocol}//${host}:8000/api/v1`;
 }
+
+const baseURL = resolveApiBaseUrl();
 
 export const api = axios.create({
   baseURL,
@@ -27,6 +33,9 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       localStorage.removeItem('usuario');
       localStorage.removeItem('whatsapp_status');
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith('whatsapp_status_'))
+        .forEach((k) => localStorage.removeItem(k));
       window.dispatchEvent(new Event('auth:logout'));
     }
     return Promise.reject(error);
