@@ -1,15 +1,28 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from typing import List
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_cargos
 from app.models.domain import ProvaResultado, AlunoMateria, Usuario
-from app.schemas.schemas import LancarNota
+from app.schemas.schemas import LancarNota, ProvaOut
 
 router = APIRouter()
 
 
-@router.post("/lancar")
+@router.get("/", response_model=List[ProvaOut])
+def listar_provas(
+    aluno_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
+):
+    query = db.query(ProvaResultado)
+    if aluno_id is not None:
+        query = query.filter(ProvaResultado.aluno_id == aluno_id)
+    return query.order_by(ProvaResultado.data_realizacao.desc()).all()
+
+
+@router.post("/lancar", response_model=ProvaOut)
 def lancar_nota(
     dados: LancarNota,
     db: Session = Depends(get_db),
@@ -37,9 +50,4 @@ def lancar_nota(
     db.add(nova_prova)
     db.commit()
     db.refresh(nova_prova)
-
-    return {
-        "mensagem": "Nota registrada com sucesso",
-        "tentativa": nova_prova.tentativa,
-        "nota": nova_prova.nota,
-    }
+    return nova_prova

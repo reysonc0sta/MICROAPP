@@ -3,9 +3,10 @@ import { Login } from './features/auth/Login';
 import { ImportarPlanilha } from './features/whatsapp/ImportarPlanilha';
 import { DispararLembretes } from './features/whatsapp/DispararLembretes';
 import { CadastroUsuario } from './features/admin/CadastroUsuario';
+import { CadastroMateria } from './features/admin/CadastroMateria';
 import { ConectarWhatsapp } from './features/whatsapp/ConectarWhatsapp';
-import { EditarMensagem } from './features/configuracoes/EditarMensagem';
 import { AcompanhamentoModulos } from './features/acompanhamento/AcompanhamentoModulos';
+import { Alunos } from './features/alunos/Alunos';
 import {
   FileSpreadsheet,
   UserPlus,
@@ -14,21 +15,23 @@ import {
   QrCode,
   Menu,
   X,
-  MessageSquareText,
   Bell,
   BookOpen,
+  GraduationCap,
+  BookMarked,
 } from 'lucide-react';
 import { ThemeToggle } from './components/ThemeToggle';
 import { api } from './services/api';
 import { statusWhatsappConectado, lerStatusWhatsapp, gravarStatusWhatsapp, limparStatusWhatsapp } from './features/whatsapp/statusWhatsapp';
 
 const NAV_ITEMS = [
-  { id: 'conectar', label: 'Conectar WhatsApp', icon: QrCode, admin: false },
-  { id: 'planilha', label: 'Disparar Faltas', icon: FileSpreadsheet, admin: false },
-  { id: 'usuarios', label: 'Gestão de Acessos', icon: UserPlus, admin: true },
-  { id: 'lembretes', label: 'Lembretes', icon: Bell, admin: false },
-  { id: 'mensagem', label: 'Mensagem', icon: MessageSquareText, admin: false },
-  { id: 'modulos', label: 'Módulos', icon: BookOpen, admin: false },
+  { id: 'conectar', label: 'Conectar WhatsApp', icon: QrCode },
+  { id: 'planilha', label: 'Disparar Faltas', icon: FileSpreadsheet },
+  { id: 'alunos', label: 'Alunos', icon: GraduationCap },
+  { id: 'materias', label: 'Matérias', icon: BookMarked, cargos: ['ADM', 'DIRETOR'] },
+  { id: 'usuarios', label: 'Gestão de Acessos', icon: UserPlus, cargos: ['ADM', 'DIRETOR'] },
+  { id: 'lembretes', label: 'Lembretes', icon: Bell },
+  { id: 'modulos', label: 'Módulos', icon: BookOpen },
 ];
 
 export default function App() {
@@ -138,7 +141,7 @@ export default function App() {
 
   const ehAdmin = ['ADM', 'DIRETOR'].includes(usuario.cargo);
   const whatsappConectado = whatsappStatus === 'CONNECTED';
-  const itensNav = NAV_ITEMS.filter((item) => !item.admin || ehAdmin);
+  const itensNav = NAV_ITEMS.filter((item) => !item.cargos || item.cargos.includes(usuario.cargo));
 
   const irPara = (aba) => {
     setAbaAtiva(aba);
@@ -249,13 +252,14 @@ export default function App() {
             onIrParaConexao={() => irPara('conectar')}
           />
         ) : null}
+        {abaAtiva === 'alunos' ? <Alunos cargoUsuario={usuario.cargo} /> : null}
+        {abaAtiva === 'materias' && ehAdmin ? <CadastroMateria /> : null}
         {abaAtiva === 'lembretes' ? (
           <DispararLembretes
             whatsappConectado={whatsappConectado}
             onIrParaConexao={() => irPara('conectar')}
           />
         ) : null}
-        {abaAtiva === 'mensagem' ? <EditarMensagem /> : null}
         {abaAtiva === 'modulos' ? <AcompanhamentoModulos /> : null}
         {abaAtiva === 'usuarios' && ehAdmin ? <CadastroUsuario /> : null}
       </main>
