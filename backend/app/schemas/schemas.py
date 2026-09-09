@@ -19,10 +19,49 @@ class AlunoOut(AlunoCreate):
         from_attributes = True
 
 
+class PaginatedAlunos(BaseModel):
+    items: list[AlunoOut]
+    total: int
+    limit: int
+    offset: int
+
+
+class MateriaVinculo(BaseModel):
+    materia_id: int
+
+
+class MateriaCreate(BaseModel):
+    nome: str = Field(..., min_length=2, max_length=100)
+
+
+class MateriaUpdate(BaseModel):
+    nome: Optional[str] = Field(None, min_length=2, max_length=100)
+
+
+class MateriaOut(BaseModel):
+    id: int
+    nome: str
+
+    class Config:
+        from_attributes = True
+
+
 class LancarNota(BaseModel):
     aluno_id: int
     materia_id: int
+    nota: float = Field(..., ge=0, le=10)
+
+
+class ProvaOut(BaseModel):
+    id: int
+    aluno_id: int
+    materia_id: int
     nota: float
+    tentativa: int
+    data_realizacao: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class NotificarNota(BaseModel):
@@ -61,6 +100,13 @@ class UsuarioOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PaginatedUsuarios(BaseModel):
+    items: list[UsuarioOut]
+    total: int
+    limit: int
+    offset: int
 
 
 class LoginSchema(BaseModel):
