@@ -73,11 +73,12 @@ export function calcularAcompanhamento({
   const modulosCorrespondentes = parcelas / mensalidadesModulo;
   const diferencaModulos = Math.max(0, modulosCorrespondentes - modulo);
   const semanasReposicao = qtdFaltas / aulasSemana;
+  // Semanas e mensalidades extras: arredonda para cima (inteiro).
+  const semanasReposicaoCeil = Math.ceil(semanasReposicao);
   const semanasPorModulo = aulasModulo / aulasSemana;
   const semanasPorMensalidade = semanasPorModulo / mensalidadesModulo;
   const mensalidadesAdicionais =
     semanasPorMensalidade > 0 ? semanasReposicao / semanasPorMensalidade : 0;
-  // Escola tipicamente cobra mensalidade inteira: arredonda para cima quando há fração.
   const mensalidadesAdicionaisCeil = Math.ceil(mensalidadesAdicionais);
   const valorReposicoes = qtdFaltas * valorRep;
 
@@ -102,10 +103,12 @@ export function calcularAcompanhamento({
     qtdFaltas,
     aulasSemana,
     semanasReposicao,
+    semanasReposicaoCeil,
     aulasModulo,
     semanasPorModulo,
     semanasPorMensalidade,
     mensalidadesAdicionais,
+    mensalidadesAdicionaisCeil,
   });
 
   return {
@@ -123,6 +126,7 @@ export function calcularAcompanhamento({
     modulosCorrespondentes,
     diferencaModulos,
     semanasReposicao,
+    semanasReposicaoCeil,
     semanasPorModulo,
     semanasPorMensalidade,
     mensalidadesAdicionais,
@@ -142,10 +146,12 @@ function montarExplicacao({
   qtdFaltas,
   aulasSemana,
   semanasReposicao,
+  semanasReposicaoCeil,
   aulasModulo,
   semanasPorModulo,
   semanasPorMensalidade,
   mensalidadesAdicionais,
+  mensalidadesAdicionaisCeil,
 }) {
   const linhas = [
     `O aluno possui ${formatarNumero(parcelas)} parcela(s) paga(s).`,
@@ -171,6 +177,7 @@ function montarExplicacao({
       '',
       `Considerando ${formatarNumero(aulasSemana)} aula(s) por semana:`,
       `${formatarNumero(qtdFaltas)} ÷ ${formatarNumero(aulasSemana)} = ${formatarNumero(semanasReposicao)} semana(s) de reposição.`,
+      `Arredondando para cima: ${formatarNumero(semanasReposicaoCeil)} semana(s).`,
       '',
       `Considerando um módulo de ${formatarNumero(aulasModulo)} aula(s):`,
       `${formatarNumero(aulasModulo)} ÷ ${formatarNumero(aulasSemana)} = ${formatarNumero(semanasPorModulo)} semana(s) por módulo.`,
@@ -178,7 +185,8 @@ function montarExplicacao({
       `Como cada módulo corresponde a ${formatarNumero(mensalidadesModulo)} mensalidade(s):`,
       `${formatarNumero(semanasPorModulo)} ÷ ${formatarNumero(mensalidadesModulo)} = ${formatarNumero(semanasPorMensalidade)} semana(s) por mensalidade.`,
       '',
-      `${formatarNumero(semanasReposicao)} ÷ ${formatarNumero(semanasPorMensalidade)} = ${formatarNumero(mensalidadesAdicionais)} mensalidade(s) adicional(is) estimada(s).`
+      `${formatarNumero(semanasReposicao)} ÷ ${formatarNumero(semanasPorMensalidade)} = ${formatarNumero(mensalidadesAdicionais)} mensalidade(s) adicional(is) estimada(s).`,
+      `Arredondando para cima: ${formatarNumero(mensalidadesAdicionaisCeil)} mensalidade(s).`
     );
   } else {
     linhas.push('Não há faltas a repor e não há extensão estimada de contrato por faltas.');
@@ -194,9 +202,9 @@ export function gerarMensagemResponsavel(resultado) {
   const parcelas = formatarNumero(resultado.parcelasPagas);
   const modulo = formatarNumero(resultado.moduloAtual);
   const faltas = formatarNumero(resultado.faltas);
-  const semanas = formatarNumero(resultado.semanasReposicao);
+  const semanas = formatarNumero(resultado.semanasReposicaoCeil);
   const valor = formatarMoedaBRL(resultado.valorReposicoes);
-  const mensalidades = formatarNumero(resultado.mensalidadesAdicionais);
+  const mensalidades = formatarNumero(resultado.mensalidadesAdicionaisCeil);
 
   return [
     `Olá, ${nome}.`,
