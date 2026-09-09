@@ -5,7 +5,6 @@
 @theme {
   --font-sans: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
 
-  /* Brand accent (navy) */
   --color-navy-50: #eef4fa;
   --color-navy-100: #d5e4f2;
   --color-navy-200: #abc8e3;
@@ -36,19 +35,35 @@ body,
 
 body {
   font-family: var(--font-sans);
-  background: #f4f4f5; /* zinc-100 */
-  color: #0f172a; /* slate-900 */
+  background: #f4f4f5;
+  color: #0f172a;
   -webkit-font-smoothing: antialiased;
 }
 
 .dark body {
-  background: #020617; /* slate-950 */
-  color: #f8fafc; /* slate-50 */
+  background: #020617;
+  color: #f8fafc;
 }
 
 #root {
   width: 100%;
   min-height: 100svh;
+}
+
+.app-shell {
+  min-height: 100svh;
+  width: 100%;
+  background-color: #f4f4f5;
+  background-image:
+    radial-gradient(ellipse 90% 55% at 50% -18%, rgba(12, 35, 64, 0.09), transparent 58%),
+    radial-gradient(ellipse 40% 30% at 100% 0%, rgba(45, 92, 142, 0.06), transparent 50%);
+}
+
+html.dark .app-shell {
+  background-color: #020617;
+  background-image:
+    radial-gradient(ellipse 90% 55% at 50% -18%, rgba(30, 69, 112, 0.28), transparent 58%),
+    radial-gradient(ellipse 40% 30% at 100% 0%, rgba(12, 35, 64, 0.45), transparent 50%);
 }
 
 .field {
@@ -60,15 +75,15 @@ body {
 }
 
 .btn-primary {
-  @apply inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition
-    hover:bg-navy-900
-    disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100
+  @apply inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-200
+    hover:bg-navy-900 hover:shadow-md
+    disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100 disabled:shadow-none
     dark:bg-navy-600 dark:hover:bg-navy-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-500;
 }
 
 .btn-secondary {
-  @apply inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition
-    hover:bg-slate-50
+  @apply inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition duration-200
+    hover:bg-slate-50 hover:shadow-md
     disabled:cursor-not-allowed disabled:opacity-50
     dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800;
 }
@@ -88,4 +103,8 @@ body {
 
 .badge {
   @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold;
+}
+
+.dropzone {
+  @apply relative min-h-[220px] rounded-2xl border-2 border-dashed p-12 text-center transition-all duration-200 sm:min-h-[260px] sm:p-16;
 }

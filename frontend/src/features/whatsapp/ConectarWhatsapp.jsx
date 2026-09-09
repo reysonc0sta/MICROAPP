@@ -163,9 +163,8 @@ export function ConectarWhatsapp({ onStatusChange }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Coluna status / instruções */}
-        <section className="flex flex-col gap-5 lg:col-span-5">
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
+        <section className="flex flex-col gap-5">
           <div className="card">
             <div className="mb-4 flex items-center justify-between gap-3">
               <h3 className="text-sm font-semibold tracking-tight text-slate-900 dark:text-white">
@@ -184,7 +183,7 @@ export function ConectarWhatsapp({ onStatusChange }) {
             </div>
 
             <dl className="space-y-3 text-sm">
-              <div className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-3 dark:border-slate-800 dark:bg-slate-950/50">
+              <div className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-3 dark:border-slate-800 dark:bg-slate-950/50">
                 <dt className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                   <Link2 size={14} />
                   Estado
@@ -193,7 +192,7 @@ export function ConectarWhatsapp({ onStatusChange }) {
                   {estadoInstancia}
                 </dd>
               </div>
-              <div className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-3 dark:border-slate-800 dark:bg-slate-950/50">
+              <div className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-3 dark:border-slate-800 dark:bg-slate-950/50">
                 <dt className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                   <Smartphone size={14} />
                   Endereço / pairing
@@ -215,8 +214,8 @@ export function ConectarWhatsapp({ onStatusChange }) {
             </button>
           </div>
 
-          <div className="card">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-tight text-slate-900 dark:text-white">
+          <div className="card flex-1">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold tracking-tight text-slate-900 dark:text-white">
               <ListOrdered size={16} className="text-slate-500" />
               Passo a passo
             </h3>
@@ -240,13 +239,12 @@ export function ConectarWhatsapp({ onStatusChange }) {
           ) : null}
         </section>
 
-        {/* Coluna QR */}
-        <section className="lg:col-span-7">
-          <div className="card flex h-full min-h-[420px] flex-col items-center justify-center text-center">
+        <section className="min-h-[28rem]">
+          <div className="card flex h-full min-h-[28rem] flex-col items-center justify-center text-center lg:min-h-[36rem]">
             {conectado ? (
               <div className="flex flex-col items-center gap-4 py-8">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40">
-                  <CheckCircle size={40} className="text-emerald-500" />
+                <div className="flex h-24 w-24 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/40">
+                  <CheckCircle size={44} className="text-emerald-500" />
                 </div>
                 <div>
                   <p className="text-lg font-bold tracking-tight text-emerald-700 dark:text-emerald-300">
@@ -267,14 +265,14 @@ export function ConectarWhatsapp({ onStatusChange }) {
               </div>
             ) : (
               <>
-                <p className="mb-4 text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                <p className="mb-5 text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
                   QR Code da sessão
                 </p>
 
-                <div className="relative flex h-72 w-72 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-950">
+                <div className="relative flex h-80 w-80 max-w-full items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-md ring-4 ring-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:ring-slate-800/80">
                   {loading ? (
                     <div className="flex flex-col items-center gap-3">
-                      <div className="h-48 w-48 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+                      <div className="h-56 w-56 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
                       <span className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                         <Loader2 size={16} className="animate-spin" />
                         Preparando QR Code...
@@ -284,18 +282,18 @@ export function ConectarWhatsapp({ onStatusChange }) {
                     <img
                       src={qrCode}
                       alt="QR Code WhatsApp"
-                      className="h-64 w-64 rounded-xl object-contain"
+                      className="h-72 w-72 rounded-xl object-contain"
                     />
                   ) : (
                     <div className="flex flex-col items-center gap-2 px-6 text-slate-400 dark:text-slate-500">
-                      <QrCode size={48} />
+                      <QrCode size={56} />
                       <p className="text-sm">Aguardando geração do QR Code</p>
                     </div>
                   )}
                 </div>
 
                 {qrCode && !loading ? (
-                  <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <p className="mt-5 text-sm font-medium text-slate-700 dark:text-slate-200">
                     Escaneie agora. Este QR expira em{' '}
                     <span className="tabular-nums text-navy-700 dark:text-navy-300">{segundosQr}s</span>.
                   </p>

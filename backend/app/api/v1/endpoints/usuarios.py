@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
-from typing import List
 
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.models.domain import Usuario
 from app.schemas.schemas import (
     UsuarioCreate,
@@ -10,6 +10,7 @@ from app.schemas.schemas import (
     UsuarioAtivoUpdate,
     RedefinirSenha,
     UsuarioOut,
+    PaginatedUsuarios,
     LoginSchema,
     TokenSchema,
 )
@@ -70,7 +71,8 @@ def cadastrar_usuario(
 
 
 @router.post("/login", response_model=TokenSchema)
-def login(dados: LoginSchema, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(request: Request, dados: LoginSchema, db: Session = Depends(get_db)):
     email = dados.email.lower().strip()
     usuario = db.query(Usuario).filter(Usuario.email == email).first()
     if not usuario or not verificar_senha(dados.senha, usuario.senha_hash):
@@ -92,12 +94,17 @@ def me(usuario: Usuario = Depends(get_current_user)):
     return usuario
 
 
-@router.get("/", response_model=List[UsuarioOut])
+@router.get("/", response_model=PaginatedUsuarios)
 def listar_usuarios(
     db: Session = Depends(get_db),
     _: Usuario = admin_deps,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
 ):
-    return db.query(Usuario).order_by(Usuario.nome.asc()).all()
+    query = db.query(Usuario)
+    total = query.count()
+    items = query.order_by(Usuario.nome.asc()).offset(offset).limit(limit).all()
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.patch("/{usuario_id}", response_model=UsuarioOut)
