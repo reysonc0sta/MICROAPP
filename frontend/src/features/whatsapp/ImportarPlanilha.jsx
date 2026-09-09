@@ -57,7 +57,7 @@ function StatusBadge({ status }) {
   };
 
   return (
-    <span className={`badge ${estilos[status] || estilos.Pendente}`}>
+    <span className={`badge shadow-sm ${estilos[status] || estilos.Pendente}`}>
       {status === 'Enviando' ? <Loader2 size={11} className="animate-spin" /> : null}
       {status === 'Enviado' ? <CheckCircle size={11} /> : null}
       {status === 'Falha' ? <PhoneOff size={11} /> : null}
@@ -82,7 +82,7 @@ function PreviewWhatsApp({ nome, faltas, texto, usandoExemplo }) {
   const inicial = (nome || EXEMPLO_NOME).charAt(0).toUpperCase();
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white/80 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-md">
       <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
         <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
           Pré-visualização
@@ -373,11 +373,11 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
         }}
         onDragLeave={() => setArrastando(false)}
         onDrop={handleDrop}
-        className={`relative rounded-2xl border-2 border-dashed p-10 text-center transition-all sm:p-14 ${
+        className={`dropzone ${
           arrastando
-            ? 'border-navy-500 bg-navy-50/80 dark:border-navy-400 dark:bg-navy-950/40'
+            ? 'border-navy-500 bg-navy-50/80 shadow-md dark:border-navy-400 dark:bg-navy-950/40'
             : dropzoneAtiva
-              ? 'cursor-pointer border-slate-300 bg-white/70 hover:border-navy-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-navy-500'
+              ? 'cursor-pointer border-slate-300 bg-white/70 shadow-sm hover:border-navy-400 hover:bg-slate-50 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-navy-500'
               : 'cursor-not-allowed border-slate-200 bg-slate-50/60 opacity-60 dark:border-slate-800 dark:bg-slate-950/40'
         }`}
       >
@@ -389,18 +389,18 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
           disabled={!dropzoneAtiva}
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
         />
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-navy-800 text-white shadow-sm dark:bg-navy-600">
-          <Upload size={24} />
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-navy-800 text-white shadow-md dark:bg-navy-600">
+          <Upload size={28} />
         </div>
-        <p className="text-base font-semibold tracking-tight text-slate-800 dark:text-slate-100">
+        <p className="text-lg font-semibold tracking-tight text-slate-800 dark:text-slate-100">
           {arquivo ? arquivo.name : 'Arraste a planilha aqui ou clique para selecionar'}
         </p>
-        <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
           Formatos suportados: Excel (.xlsx, .xls)
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card space-y-3">
           <div className="flex items-center gap-2">
             <MessageSquareText size={18} className="text-navy-600 dark:text-navy-300" />
@@ -471,18 +471,18 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
       ) : null}
 
       {preview ? (
-        <div className="card space-y-4 !p-0 overflow-hidden">
+        <div className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white/80 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-md">
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
-            <span className="badge border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+            <span className="badge border-slate-200 bg-slate-50 text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
               <Users size={12} />
               {preview.total_linhas} aluno(s) com falta
             </span>
-            <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+            <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
               <CheckCircle size={12} />
               {preview.total_validos} receberão mensagem
             </span>
             {preview.total_invalidos > 0 ? (
-              <span className="badge border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
+              <span className="badge border-red-200 bg-red-50 text-red-700 shadow-sm dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
                 <PhoneOff size={12} />
                 {preview.total_invalidos} sem telefone válido
               </span>
@@ -493,11 +493,11 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
                 <tr>
-                  <th className="px-4 py-3 font-semibold sm:px-6">Aluno</th>
-                  <th className="px-4 py-3 font-semibold">Faltas</th>
-                  <th className="px-4 py-3 font-semibold">Telefone</th>
-                  <th className="px-4 py-3 font-semibold">Canal</th>
-                  <th className="px-4 py-3 font-semibold sm:px-6">Status</th>
+                  <th className="px-4 py-3.5 font-semibold sm:px-6">Aluno</th>
+                  <th className="px-4 py-3.5 font-semibold">Faltas</th>
+                  <th className="px-4 py-3.5 font-semibold">Telefone</th>
+                  <th className="px-4 py-3.5 font-semibold">Canal</th>
+                  <th className="px-4 py-3.5 font-semibold sm:px-6">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -513,7 +513,7 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
                       onClick={() => {
                         if (candidato.valido) setAlunoSelecionado(candidato);
                       }}
-                      className={`transition ${
+                      className={`transition duration-150 ${
                         candidato.valido ? 'cursor-pointer' : ''
                       } ${
                         selecionado
@@ -521,14 +521,14 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
                           : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40'
                       }`}
                     >
-                      <td className="px-4 py-3 font-medium text-slate-900 sm:px-6 dark:text-slate-100">
+                      <td className="px-4 py-3.5 font-medium text-slate-900 sm:px-6 dark:text-slate-100">
                         {candidato.nome}
                       </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{candidato.faltas}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-300">
+                      <td className="px-4 py-3.5 text-slate-600 dark:text-slate-300">{candidato.faltas}</td>
+                      <td className="px-4 py-3.5 font-mono text-xs text-slate-600 dark:text-slate-300">
                         {candidato.numero || '—'}
                       </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                      <td className="px-4 py-3.5 text-slate-600 dark:text-slate-300">
                         {candidato.canal ? (
                           <span className="inline-flex items-center gap-1">
                             {candidato.canal === 'PESSOAL' ? 'Pessoal' : 'Comercial'}
@@ -540,7 +540,7 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
                           '—'
                         )}
                       </td>
-                      <td className="px-4 py-3 sm:px-6">
+                      <td className="px-4 py-3.5 sm:px-6">
                         <div className="flex flex-col gap-1">
                           <StatusBadge status={status} />
                           {!candidato.valido && candidato.motivo_invalido ? (
@@ -567,7 +567,7 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
                 type="button"
                 disabled={pagina <= 1}
                 onClick={() => setPagina((p) => Math.max(1, p - 1))}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <ChevronLeft size={16} />
               </button>
@@ -575,7 +575,7 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
                 type="button"
                 disabled={pagina >= totalPaginas}
                 onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <ChevronRight size={16} />
               </button>

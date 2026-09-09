@@ -261,15 +261,11 @@ export function AcompanhamentoModulos() {
                   />
                   <DestaqueMetric
                     rotulo="Semanas de reposição"
-                    valor={formatarNumero(resultado.semanasReposicao)}
+                    valor={formatarNumero(resultado.semanasReposicaoCeil)}
                   />
                   <DestaqueMetric
                     rotulo="Mensalidades extras"
-                    valor={
-                      resultado.mensalidadesAdicionais !== resultado.mensalidadesAdicionaisCeil
-                        ? `${formatarNumero(resultado.mensalidadesAdicionais)} → ${formatarNumero(resultado.mensalidadesAdicionaisCeil)}`
-                        : formatarNumero(resultado.mensalidadesAdicionais)
-                    }
+                    valor={formatarNumero(resultado.mensalidadesAdicionaisCeil)}
                   />
                 </div>
 
@@ -292,7 +288,7 @@ export function AcompanhamentoModulos() {
                   <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300">
                     {formatarNumero(resultado.faltas)} falta(s) representam aproximadamente{' '}
                     <strong className="text-slate-800 dark:text-slate-100">
-                      {formatarNumero(resultado.semanasReposicao)} semana(s)
+                      {formatarNumero(resultado.semanasReposicaoCeil)} semana(s)
                     </strong>{' '}
                     de aulas para reposição.
                   </p>

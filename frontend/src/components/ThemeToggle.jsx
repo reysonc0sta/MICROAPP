@@ -17,7 +17,7 @@ export function ThemeToggle({ variant = 'default' }) {
       onClick={toggleTheme}
       aria-label={escuro ? 'Ativar tema claro' : 'Ativar tema escuro'}
       title={escuro ? 'Tema claro' : 'Tema escuro'}
-      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition ${base}`}
+      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border shadow-sm transition duration-200 ${base}`}
     >
       {escuro ? <Sun size={16} /> : <Moon size={16} />}
     </button>

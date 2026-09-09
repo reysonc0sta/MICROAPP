@@ -32,8 +32,8 @@ export function Login({ onLoginSuccess }) {
   };
 
   return (
-    <div className="relative flex min-h-svh items-center justify-center bg-zinc-100 p-4 dark:bg-slate-950">
-      <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
+    <div className="app-shell relative flex items-center justify-center p-6">
+      <div className="absolute right-6 top-6">
         <ThemeToggle />
       </div>
 

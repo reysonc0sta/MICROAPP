@@ -3,13 +3,13 @@ import os
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal, get_db
 from app.core.security import get_current_user
-from app.models.domain import Usuario
+from app.models.domain import Aluno, Materia, ProvaResultado, Usuario
 from app.services.config_service import obter_template_lembrete, obter_template_mensagem
 from app.services.historico_service import registrar_envio_whatsapp
 from app.services.lembrete_service import (
@@ -21,7 +21,7 @@ from app.services.reposicao_service import (
     preview_disparos_faltas_excel,
     processar_disparos_faltas_excel,
 )
-from app.services.telefones import limpar_telefone
+from app.services.telefones import candidatos_envio, limpar_telefone
 from app.services.whatsapp_service import (
     conectar_whatsapp,
     disparar_mensagem_real,
@@ -106,6 +106,70 @@ def conectar(forcar: bool = False, usuario: Usuario = Depends(get_current_user))
     """Cria/consulta a instância Evolution deste usuário e retorna o QR Code."""
     instance_name = nome_instancia_usuario(usuario)
     return conectar_whatsapp(instance_name, forcar_novo=forcar)
+
+
+@router.post("/notificar-nota")
+def notificar_nota(
+    aluno_id: int = Query(...),
+    materia_id: int = Query(...),
+    usuario: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Envia a última nota do aluno na matéria via WhatsApp."""
+    instance_name = nome_instancia_usuario(usuario)
+    exigir_whatsapp_conectado(instance_name)
+
+    aluno = db.query(Aluno).filter(Aluno.id == aluno_id).first()
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
+
+    materia = db.query(Materia).filter(Materia.id == materia_id).first()
+    if not materia:
+        raise HTTPException(status_code=404, detail="Matéria não encontrada.")
+
+    prova = (
+        db.query(ProvaResultado)
+        .filter(ProvaResultado.aluno_id == aluno_id, ProvaResultado.materia_id == materia_id)
+        .order_by(ProvaResultado.tentativa.desc())
+        .first()
+    )
+    if not prova:
+        raise HTTPException(status_code=400, detail="Não há nota lançada para esta matéria.")
+
+    canais = candidatos_envio(aluno.telefone_pessoal, aluno.telefone_comercial)
+    if not canais:
+        raise HTTPException(status_code=400, detail="Aluno sem telefone válido cadastrado.")
+
+    primeiro_nome = aluno.nome.split()[0].title()
+    texto = (
+        f"Olá, {primeiro_nome}! Sua nota em {materia.nome} foi {prova.nota} "
+        f"({prova.tentativa}ª tentativa)."
+    )
+
+    enviado = False
+    canal_usado = canais[0]
+    for canal in canais:
+        canal_usado = canal
+        if disparar_mensagem_real(canal["numero"], texto, instance_name):
+            enviado = True
+            break
+
+    registrar_envio_whatsapp(
+        db,
+        numero=canal_usado["numero"],
+        canal=canal_usado["canal"],
+        usou_fallback=canal_usado["usou_fallback"],
+        texto=texto,
+        status_final="SUCESSO" if enviado else "FALHA_AMBOS",
+        nome_destino=aluno.nome,
+        aluno_id=aluno.id,
+    )
+    if not enviado:
+        raise HTTPException(
+            status_code=502,
+            detail="Falha ao enviar a nota pela Evolution API. Verifique a conexão.",
+        )
+    return {"sucesso": True, "mensagem": "Nota enviada via WhatsApp.", "instanceName": instance_name}
 
 
 @router.post("/enviar-direto")
@@ -222,24 +286,6 @@ async def disparar_lembretes(
 
 @router.post("/upload-planilha", status_code=202)
 async def upload_planilha(
-    background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    usuario: Usuario = Depends(get_current_user),
-):
-    instance_name = nome_instancia_usuario(usuario)
-    exigir_whatsapp_conectado(instance_name)
-    temp_path = await _salvar_upload_seguro(file)
-    background_tasks.add_task(_job_disparar_faltas, temp_path, instance_name)
-    return {
-        "mensagem": "Disparo de reposição iniciado em segundo plano. O histórico será gravado no banco.",
-        "status": "PROCESSANDO",
-        "nome_arquivo": file.filename,
-        "instanceName": instance_name,
-    }
-
-
-@router.post("/disparar-reposicoes", status_code=202)
-async def disparar_reposicoes(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     usuario: Usuario = Depends(get_current_user),

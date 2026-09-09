@@ -117,8 +117,8 @@ export function CadastroUsuario() {
     setCarregandoLista(true);
     setErroLista('');
     try {
-      const { data } = await api.get('/usuarios/');
-      setUsuarios(Array.isArray(data) ? data : []);
+      const { data } = await api.get('/usuarios/', { params: { limit: 100, offset: 0 } });
+      setUsuarios(Array.isArray(data) ? data : data.items || []);
     } catch (err) {
       setErroLista(apiErrorMessage(err, 'Erro ao carregar usuários cadastrados.'));
     } finally {
