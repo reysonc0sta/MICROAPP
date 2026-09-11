@@ -1,41 +1,95 @@
-Apply
-# Projeto de Aplicação de Chat
+# MICROAPP
 
-Este projeto é uma aplicação de chat interativa desenvolvida para facilitar a comunicação e a realização de tarefas através de comandos de texto.
+Sistema de gestão escolar com disparos de WhatsApp (faltas, lembretes e notas), cadastro de alunos/matérias, lançamento de provas e controle de acesso por papéis.
 
-## Funcionalidades
+## Stack
 
-- **Conversa Interativa**: Realize conversas em tempo real com o assistente de inteligência artificial.
-- **Realize Tarefas**: Execute comandos para realizar várias tarefas, como buscar informações, agendar eventos, etc.
-- **Interface Amigável**: A aplicação possui uma interface de usuário amigável e fácil de usar.
+| Camada | Tecnologia |
+| --- | --- |
+| Backend | FastAPI + SQLAlchemy |
+| Frontend | React 19 + Vite + Tailwind CSS |
+| Banco | PostgreSQL 15 |
+| WhatsApp | Evolution API |
+| Orquestração | Docker Compose |
+| Auth | JWT com papéis ADM, DIRETOR, PROFESSOR, ASSISTENTE, ANALISTA |
 
-## Tecnologias Utilizadas
+## Estrutura
 
-- **Python**: Para o desenvolvimento da lógica da aplicação.
-- **HTML**: Para a estrutura da interface do usuário.
-- **CSS**: Para o estilo e a formatação da interface.
-- **JavaScript**: Para adicionar interatividade e funcionalidades dinâmicas.
+```
+MICROAPP/
+├── backend/          # API FastAPI (app/, tests/, seed.py)
+├── frontend/         # SPA React + Vite
+├── docker/           # scripts de init do Postgres
+├── docker-compose.yml
+└── .env.example      # modelo de variáveis (copie para .env)
+```
 
-## Estrutura do Projeto
+## Pré-requisitos
 
-O projeto é organizado da seguinte forma:
+- Docker e Docker Compose
+- Arquivo `.env` na raiz (nunca versionado)
 
-- `src/main.py`: Arquivo principal da aplicação, responsável por iniciar a interface e processar as solicitações.
-- `templates/index.html`: Arquivo de template HTML para a página inicial da aplicação.
-- `static/styles.css`: Arquivo de estilo CSS para a interface do usuário.
-- `static/scripts.js`: Arquivo de script JavaScript para adicionar interatividade.
+## Setup
 
-## Como Executar o Projeto
+1. Clone o repositório e entre na pasta do projeto.
 
-1. Clone o repositório do GitHub.
-2. Instale as dependências usando `pip install -r requirements.txt`.
-3. Execute o arquivo `src/main.py` usando `python src/main.py`.
-4. Acesse a aplicação em seu navegador em `http://localhost:5000`.
+2. Crie o `.env` a partir do exemplo e preencha valores reais:
 
-## Contribuição
+```bash
+cp .env.example .env
+```
 
-Se você quiser contribuir para este projeto, sinta-se à vontade para abrir issues ou fazer pull requests.
+Variáveis obrigatórias para o Compose (veja `.env.example`):
+
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
+- `SECRET_KEY` (JWT)
+- `EVOLUTION_API_KEY`
+- `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+- `CORS_ALLOWED_ORIGINS` (origens explícitas do frontend; não use `*`)
+- `VITE_API_URL` (ex.: `http://localhost:8000/api/v1`)
+
+Há também exemplos locais em `backend/.env.example` e `frontend/.env.example` se rodar serviços fora do Docker.
+
+3. Suba a stack:
+
+```bash
+docker compose up -d --build
+```
+
+Serviços:
+
+| Serviço | URL |
+| --- | --- |
+| Frontend | http://localhost:5173 |
+| API | http://localhost:8000 (`/docs` para Swagger) |
+| Evolution API | http://localhost:8080 |
+| Postgres | apenas em `127.0.0.1:5432` (não exposto na LAN) |
+
+4. Seed do admin (se ainda não existir):
+
+Na subida, o backend já tenta criar o ADM se `ADMIN_PASSWORD` estiver definido. Para forçar via script:
+
+```bash
+docker compose exec backend python seed.py
+```
+
+## Papéis (resumo)
+
+- **ADM / DIRETOR** — gestão de usuários e matérias; acesso amplo
+- **PROFESSOR** — grade, notas e disparos operacionais de WhatsApp
+- **ASSISTENTE** — cadastro de alunos e disparos de WhatsApp
+- **ANALISTA** — leitura (ex.: listagem de alunos); sem disparos em massa
+
+## Desenvolvimento
+
+```bash
+# logs
+docker compose logs -f backend
+
+# testes do backend
+docker compose run --no-deps --rm backend python -m pytest -q
+```
 
 ## Licença
 
-Este projeto é licenciado sob a Licença MIT. Consulte o arquivo `LICENSE` para obter mais detalhes.
+Consulte o arquivo `LICENSE` no repositório, se presente.
