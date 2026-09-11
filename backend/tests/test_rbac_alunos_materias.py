@@ -32,6 +32,20 @@ def assert_negado(cargos_ok, cargo):
     assert exc.value.status_code == 403
 
 
+@pytest.mark.parametrize("cargo", ["ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE", "ANALISTA"])
+def test_listar_alunos_permitido(cargo):
+    assert_permitido(("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE", "ANALISTA"), cargo)
+
+
+@pytest.mark.parametrize("cargo", ["ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"])
+def test_whatsapp_ops_permitido(cargo):
+    assert_permitido(("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"), cargo)
+
+
+def test_whatsapp_ops_negado_analista():
+    assert_negado(("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"), "ANALISTA")
+
+
 @pytest.mark.parametrize("cargo", ["ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"])
 def test_criar_aluno_permitido(cargo):
     assert_permitido(("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"), cargo)

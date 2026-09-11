@@ -9,6 +9,8 @@ from app.schemas.schemas import AlunoCreate, AlunoOut, MateriaOut, MateriaVincul
 
 router = APIRouter()
 grade_deps = Depends(require_cargos("ADM", "DIRETOR", "PROFESSOR"))
+leitura_deps = Depends(require_cargos("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE", "ANALISTA"))
+cadastro_deps = Depends(require_cargos("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"))
 
 
 def _obter_aluno_ou_404(db: Session, aluno_id: int) -> Aluno:
@@ -22,7 +24,7 @@ def _obter_aluno_ou_404(db: Session, aluno_id: int) -> Aluno:
 def criar_aluno(
     dados: AlunoCreate,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(require_cargos("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE")),
+    _: Usuario = cadastro_deps,
 ):
     novo_aluno = Aluno(**dados.model_dump())
     db.add(novo_aluno)
@@ -34,7 +36,7 @@ def criar_aluno(
 @router.get("/", response_model=PaginatedAlunos)
 def listar_alunos(
     db: Session = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    _: Usuario = leitura_deps,
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):

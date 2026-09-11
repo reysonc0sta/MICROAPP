@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal, get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_cargos
 from app.models.domain import Aluno, Materia, ProvaResultado, Usuario
 from app.services.config_service import obter_template_lembrete, obter_template_mensagem
 from app.services.historico_service import registrar_envio_whatsapp
@@ -32,6 +32,8 @@ from app.services.whatsapp_service import (
 )
 
 router = APIRouter()
+# Disparo operacional (faltas, lembretes, mensagem direta) — opção B
+whatsapp_ops_deps = Depends(require_cargos("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"))
 
 EXTENSOES_PLANILHA = {".xls", ".xlsx"}
 
@@ -175,7 +177,7 @@ def notificar_nota(
 @router.post("/enviar-direto")
 def enviar_direto(
     body: EnviarDiretoBody,
-    usuario: Usuario = Depends(get_current_user),
+    usuario: Usuario = whatsapp_ops_deps,
     db: Session = Depends(get_db),
 ):
     """Dispara uma mensagem individual via Evolution API na instância do usuário."""
@@ -211,7 +213,7 @@ def enviar_direto(
 async def preview_planilha(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    _: Usuario = whatsapp_ops_deps,
 ):
     """Lê a planilha e devolve a lista de quem receberia mensagem, sem disparar nada."""
     temp_path = await _salvar_upload_seguro(file)
@@ -235,7 +237,7 @@ async def preview_lembretes(
     file: UploadFile = File(...),
     turno: str = Form("TODOS"),
     db: Session = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    _: Usuario = whatsapp_ops_deps,
 ):
     """Prévia dos alunos do turno selecionado que receberiam o lembrete."""
     turno_norm = (turno or "TODOS").strip().upper()
@@ -263,7 +265,7 @@ async def disparar_lembretes(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     turno: str = Form("TODOS"),
-    usuario: Usuario = Depends(get_current_user),
+    usuario: Usuario = whatsapp_ops_deps,
 ):
     instance_name = nome_instancia_usuario(usuario)
     exigir_whatsapp_conectado(instance_name)
@@ -288,7 +290,7 @@ async def disparar_lembretes(
 async def upload_planilha(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    usuario: Usuario = Depends(get_current_user),
+    usuario: Usuario = whatsapp_ops_deps,
 ):
     instance_name = nome_instancia_usuario(usuario)
     exigir_whatsapp_conectado(instance_name)

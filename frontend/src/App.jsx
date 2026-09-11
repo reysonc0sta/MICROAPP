@@ -26,11 +26,21 @@ import { statusWhatsappConectado, lerStatusWhatsapp, gravarStatusWhatsapp, limpa
 
 const NAV_ITEMS = [
   { id: 'conectar', label: 'Conectar WhatsApp', icon: QrCode },
-  { id: 'planilha', label: 'Disparar Faltas', icon: FileSpreadsheet },
+  {
+    id: 'planilha',
+    label: 'Disparar Faltas',
+    icon: FileSpreadsheet,
+    cargos: ['ADM', 'DIRETOR', 'PROFESSOR', 'ASSISTENTE'],
+  },
   { id: 'alunos', label: 'Alunos', icon: GraduationCap },
   { id: 'materias', label: 'Matérias', icon: BookMarked, cargos: ['ADM', 'DIRETOR'] },
   { id: 'usuarios', label: 'Gestão de Acessos', icon: UserPlus, cargos: ['ADM', 'DIRETOR'] },
-  { id: 'lembretes', label: 'Lembretes', icon: Bell },
+  {
+    id: 'lembretes',
+    label: 'Lembretes',
+    icon: Bell,
+    cargos: ['ADM', 'DIRETOR', 'PROFESSOR', 'ASSISTENTE'],
+  },
   { id: 'modulos', label: 'Módulos', icon: BookOpen },
 ];
 
@@ -149,12 +159,10 @@ export default function App() {
   };
 
   const classeAba = (aba, compacta = false) =>
-    `inline-flex items-center gap-2 whitespace-nowrap rounded-full font-medium transition-all duration-200 ease-out ${
-      compacta ? 'px-3.5 py-2 text-sm' : 'px-4 py-1.5 text-sm'
-    } ${
-      abaAtiva === aba
-        ? 'bg-navy-800 text-white shadow-sm dark:bg-navy-600'
-        : 'text-slate-600 hover:bg-white/90 hover:text-slate-900 hover:shadow-sm dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
+    `inline-flex items-center gap-2 whitespace-nowrap rounded-full font-medium transition-all duration-200 ease-out ${compacta ? 'px-3.5 py-2 text-sm' : 'px-4 py-1.5 text-sm'
+    } ${abaAtiva === aba
+      ? 'bg-navy-800 text-white shadow-sm dark:bg-navy-600'
+      : 'text-slate-600 hover:bg-white/90 hover:text-slate-900 hover:shadow-sm dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
     }`;
 
   return (
@@ -231,9 +239,8 @@ export default function App() {
                 {label}
                 {id === 'conectar' ? (
                   <span
-                    className={`ml-auto h-2 w-2 rounded-full ${
-                      whatsappConectado ? 'bg-emerald-400' : 'bg-amber-400'
-                    }`}
+                    className={`ml-auto h-2 w-2 rounded-full ${whatsappConectado ? 'bg-emerald-400' : 'bg-amber-400'
+                      }`}
                   />
                 ) : null}
               </button>
