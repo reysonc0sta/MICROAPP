@@ -1,5 +1,6 @@
 """RBAC de Alunos, Matérias e lançamento de nota — funções de endpoint + papéis."""
 
+import inspect
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -9,6 +10,7 @@ from fastapi import HTTPException
 from app.api.v1.endpoints import alunos as alunos_ep
 from app.api.v1.endpoints import materias as materias_ep
 from app.api.v1.endpoints import provas as provas_ep
+from app.api.v1.endpoints import whatsapp as whatsapp_ep
 from app.core.security import require_cargos
 from app.schemas.schemas import AlunoCreate, LancarNota, MateriaCreate, MateriaUpdate, MateriaVinculo
 
@@ -44,6 +46,16 @@ def test_whatsapp_ops_permitido(cargo):
 
 def test_whatsapp_ops_negado_analista():
     assert_negado(("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"), "ANALISTA")
+
+
+def test_notificar_nota_usa_whatsapp_ops_deps():
+    param = inspect.signature(whatsapp_ep.notificar_nota).parameters["usuario"]
+    assert param.default is whatsapp_ep.whatsapp_ops_deps
+
+
+def test_obter_aluno_e_grade_usam_leitura_deps():
+    assert inspect.signature(alunos_ep.obter_aluno).parameters["_"].default is alunos_ep.leitura_deps
+    assert inspect.signature(alunos_ep.listar_grade_aluno).parameters["_"].default is alunos_ep.leitura_deps
 
 
 @pytest.mark.parametrize("cargo", ["ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"])

@@ -114,7 +114,7 @@ def conectar(forcar: bool = False, usuario: Usuario = Depends(get_current_user))
 def notificar_nota(
     aluno_id: int = Query(...),
     materia_id: int = Query(...),
-    usuario: Usuario = Depends(get_current_user),
+    usuario: Usuario = whatsapp_ops_deps,
     db: Session = Depends(get_db),
 ):
     """Envia a última nota do aluno na matéria via WhatsApp."""

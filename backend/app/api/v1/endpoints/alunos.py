@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_cargos
+from app.core.security import require_cargos
 from app.models.domain import Aluno, AlunoMateria, Materia, Usuario
 from app.schemas.schemas import AlunoCreate, AlunoOut, MateriaOut, MateriaVinculo, PaginatedAlunos
 
@@ -50,7 +50,7 @@ def listar_alunos(
 def obter_aluno(
     aluno_id: int,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    _: Usuario = leitura_deps,
 ):
     return _obter_aluno_ou_404(db, aluno_id)
 
@@ -59,7 +59,7 @@ def obter_aluno(
 def listar_grade_aluno(
     aluno_id: int,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    _: Usuario = leitura_deps,
 ):
     _obter_aluno_ou_404(db, aluno_id)
     return (
