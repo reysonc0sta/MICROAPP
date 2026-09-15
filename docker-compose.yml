@@ -70,6 +70,7 @@ services:
       - EVOLUTION_INSTANCE_NAME=${EVOLUTION_INSTANCE_NAME:-hub_escola}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      - CORS_ALLOW_LAN=${CORS_ALLOW_LAN:-true}
       - ADMIN_EMAIL=${ADMIN_EMAIL:?Defina ADMIN_EMAIL no .env}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Defina ADMIN_PASSWORD no .env}
     depends_on:

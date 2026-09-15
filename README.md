@@ -21,7 +21,7 @@ MICROAPP/
 ├── frontend/         # SPA React + Vite
 ├── docker/           # scripts de init do Postgres
 ├── docker-compose.yml
-└── .env.example      # modelo de variáveis (copie para .env)
+└── .env              # variáveis de ambiente (não versionado)
 ```
 
 ## Pré-requisitos
@@ -33,22 +33,17 @@ MICROAPP/
 
 1. Clone o repositório e entre na pasta do projeto.
 
-2. Crie o `.env` a partir do exemplo e preencha valores reais:
-
-```bash
-cp .env.example .env
-```
-
-Variáveis obrigatórias para o Compose (veja `.env.example`):
+2. Preencha o `.env` na raiz. Variáveis obrigatórias para o Compose:
 
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
 - `SECRET_KEY` (JWT)
 - `EVOLUTION_API_KEY`
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD`
 - `CORS_ALLOWED_ORIGINS` (origens explícitas do frontend; não use `*`)
+- `CORS_ALLOW_LAN` (acesso pelo IP da rede local)
 - `VITE_API_URL` (ex.: `http://localhost:8000/api/v1`)
 
-Há também exemplos locais em `backend/.env.example` e `frontend/.env.example` se rodar serviços fora do Docker.
+Há também `.env` em `backend/` e `frontend/` se rodar serviços fora do Docker.
 
 3. Suba a stack:
 

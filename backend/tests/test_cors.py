@@ -28,3 +28,21 @@ def test_cors_rejeita_wildcard_em_allowed_origins():
 def test_cors_rejeita_wildcard_na_lista():
     with pytest.raises(ValidationError):
         Settings(**BASE, CORS_ORIGINS="http://localhost:5173,*")
+
+
+def test_cors_regex_lan_libera_ip_privado():
+    import re
+
+    settings = Settings(**BASE)
+    regex = re.compile(settings.cors_allow_origin_regex)
+    assert regex.fullmatch("http://192.168.0.10:5173")
+    assert regex.fullmatch("http://10.0.0.5:5173")
+    assert regex.fullmatch("http://172.16.1.2:5173")
+    assert regex.fullmatch("http://localhost:5173")
+    assert not regex.fullmatch("https://evil.example.com")
+    assert not regex.fullmatch("http://8.8.8.8:5173")
+
+
+def test_cors_regex_lan_pode_ser_desligado():
+    settings = Settings(**BASE, CORS_ALLOW_LAN=False)
+    assert settings.cors_allow_origin_regex is None
