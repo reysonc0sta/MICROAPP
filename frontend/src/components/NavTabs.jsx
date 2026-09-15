@@ -3,6 +3,7 @@ import {
   Bell,
   BookMarked,
   BookOpen,
+  ClipboardList,
   FileSpreadsheet,
   GraduationCap,
   QrCode,
@@ -18,6 +19,12 @@ const NAV_ITEMS = [
     cargos: ['ADM', 'DIRETOR', 'PROFESSOR', 'ASSISTENTE'],
   },
   { id: 'alunos', label: 'Alunos', icon: GraduationCap },
+  {
+    id: 'provas',
+    label: 'Provas',
+    icon: ClipboardList,
+    cargos: ['ADM', 'DIRETOR', 'PROFESSOR', 'ASSISTENTE'],
+  },
   { id: 'materias', label: 'Matérias', icon: BookMarked, cargos: ['ADM', 'DIRETOR'] },
   { id: 'usuarios', label: 'Gestão de Acessos', icon: UserPlus, cargos: ['ADM', 'DIRETOR'] },
   {

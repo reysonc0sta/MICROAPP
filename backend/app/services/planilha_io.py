@@ -15,11 +15,11 @@ def _escolher_engine(caminho_arquivo: str) -> str | None:
     return None
 
 
-def ler_planilha_excel(caminho_arquivo: str) -> pd.DataFrame:
+def ler_planilha_excel(caminho_arquivo: str, header: int | None = 0) -> pd.DataFrame:
     """Lê .xls (xlrd) ou .xlsx (openpyxl) com mensagem de erro clara."""
     engine = _escolher_engine(caminho_arquivo)
     try:
-        return pd.read_excel(caminho_arquivo, engine=engine)
+        return pd.read_excel(caminho_arquivo, engine=engine, header=header)
     except ImportError as exc:
         if engine == "xlrd":
             raise ValueError(

@@ -53,6 +53,28 @@ def test_notificar_nota_usa_whatsapp_ops_deps():
     assert param.default is whatsapp_ep.whatsapp_ops_deps
 
 
+def test_upload_pos_prova_usa_relatorio_deps():
+    param = inspect.signature(provas_ep.upload_planilha_pos_prova).parameters["_"]
+    assert param.default is provas_ep.relatorio_deps
+    assert "db" not in inspect.signature(provas_ep.upload_planilha_pos_prova).parameters
+
+
+@pytest.mark.parametrize("cargo", ["ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"])
+def test_upload_pos_prova_permitido(cargo):
+    assert_permitido(("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"), cargo)
+
+
+def test_upload_pos_prova_negado_analista():
+    assert_negado(("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"), "ANALISTA")
+
+
+def test_exportar_pdf_usa_relatorio_deps():
+    param = inspect.signature(provas_ep.exportar_pdf_pos_prova).parameters["_"]
+    assert param.default is provas_ep.relatorio_deps
+    assert "db" not in inspect.signature(provas_ep.exportar_pdf_pos_prova).parameters
+    assert inspect.signature(provas_ep.exportar_pdf_pos_prova).parameters["dados"].annotation is provas_ep.RelatorioPosProvaOut
+
+
 def test_obter_aluno_e_grade_usam_leitura_deps():
     assert inspect.signature(alunos_ep.obter_aluno).parameters["_"].default is alunos_ep.leitura_deps
     assert inspect.signature(alunos_ep.listar_grade_aluno).parameters["_"].default is alunos_ep.leitura_deps

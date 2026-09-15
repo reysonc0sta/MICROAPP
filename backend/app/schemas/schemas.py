@@ -69,6 +69,23 @@ class NotificarNota(BaseModel):
     materia_id: int
 
 
+class ProvaRelatorioItem(BaseModel):
+    materia: Optional[str] = None
+    nota: Optional[float] = None
+    nota_exibicao: Optional[str] = None
+
+
+class AlunoProvasRelatorio(BaseModel):
+    nome: str
+    provas: list[ProvaRelatorioItem]
+
+
+class RelatorioPosProvaOut(BaseModel):
+    alunos: list[AlunoProvasRelatorio]
+    total_alunos: int
+    total_ocorrencias: int
+
+
 class UsuarioCreate(BaseModel):
     nome: str = Field(..., min_length=2, max_length=150)
     email: str = Field(..., min_length=5, max_length=150)

@@ -7,6 +7,7 @@ import { CadastroMateria } from './features/admin/CadastroMateria';
 import { ConectarWhatsapp } from './features/whatsapp/ConectarWhatsapp';
 import { AcompanhamentoModulos } from './features/acompanhamento/AcompanhamentoModulos';
 import { Alunos } from './features/alunos/Alunos';
+import { RelatorioProvas } from './features/provas/RelatorioProvas';
 import { Header } from './components/Header';
 import { NavTabs } from './components/NavTabs';
 import { useSessao } from './hooks/useSessao';
@@ -41,6 +42,7 @@ export default function App() {
   }
 
   const ehAdmin = ['ADM', 'DIRETOR'].includes(usuario.cargo);
+  const podeVerProvas = ['ADM', 'DIRETOR', 'PROFESSOR', 'ASSISTENTE'].includes(usuario.cargo);
 
   return (
     <div className="app-shell font-sans text-slate-900 dark:text-slate-50">
@@ -71,6 +73,7 @@ export default function App() {
           />
         ) : null}
         {abaAtiva === 'alunos' ? <Alunos cargoUsuario={usuario.cargo} /> : null}
+        {abaAtiva === 'provas' && podeVerProvas ? <RelatorioProvas /> : null}
         {abaAtiva === 'materias' && ehAdmin ? <CadastroMateria /> : null}
         {abaAtiva === 'lembretes' ? (
           <DispararLembretes

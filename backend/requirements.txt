@@ -18,3 +18,4 @@ Pillow==12.3.0
 slowapi==0.1.9
 limits==4.2
 pytest==8.4.2
+reportlab==4.4.10
