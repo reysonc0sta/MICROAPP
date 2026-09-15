@@ -11,10 +11,10 @@ from app.services.config_service import (
     renderizar_mensagem_lembrete,
 )
 from app.services.planilha_io import (
-    COLUNAS_OBRIGATORIAS_LEMBRETES,
     celula_texto,
+    exigir_coluna_nome_aluno,
     ler_planilha_excel,
-    validar_colunas,
+    nome_da_linha,
 )
 
 TURNOS_VALIDOS = {"MANHA", "TARDE", "NOITE", "TODOS"}
@@ -60,8 +60,7 @@ def montar_candidatos_lembrete(
 ) -> list[dict]:
     turno_filtro = validar_turno(turno)
     df = ler_planilha_excel(caminho_arquivo)
-    validar_colunas(df, COLUNAS_OBRIGATORIAS_LEMBRETES)
-    df = df.dropna(subset=["Nome Aluno"])
+    colunas_nome = exigir_coluna_nome_aluno(df)
 
     if "Status Contrato" in df.columns:
         df = df[df["Status Contrato"] == "Ativo"]
@@ -69,7 +68,7 @@ def montar_candidatos_lembrete(
     candidatos = []
 
     for _, row in df.iterrows():
-        nome = celula_texto(row["Nome Aluno"])
+        nome = nome_da_linha(row, colunas_nome)
         if not nome:
             continue
         turno_bruto = row.get("Turno")

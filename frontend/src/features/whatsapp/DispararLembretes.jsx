@@ -209,8 +209,8 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
             Disparar Lembretes
           </h2>
           <p className="page-subtitle mt-1">
-            Use a mesma planilha do Hub Escola. Escolha o turno e envie avisos (ex.: não haverá aula)
-            só para esse grupo.
+            Use a mesma planilha do Hub Escola. O nome é lido das colunas Aluno ou Nome Aluno.
+            Escolha o turno e envie avisos (ex.: não haverá aula) só para esse grupo.
           </p>
         </div>
         {arquivo && !carregando ? (

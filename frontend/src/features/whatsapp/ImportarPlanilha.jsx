@@ -340,7 +340,8 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
           </h2>
           <p className="page-subtitle mt-1">
             Envie a planilha, ajuste a mensagem, revise a prévia e confirme o disparo em massa.
-            Somente alunos com 2 ou mais faltas recebem a mensagem.
+            O nome é lido das colunas Aluno ou Nome Aluno. Somente alunos com 2 ou mais faltas
+            reais recebem a mensagem (faltas menos reposição da planilha).
           </p>
         </div>
         {arquivo && !carregando ? (
@@ -494,7 +495,7 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
               <thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
                 <tr>
                   <th className="px-4 py-3.5 font-semibold sm:px-6">Aluno</th>
-                  <th className="px-4 py-3.5 font-semibold">Faltas</th>
+                  <th className="px-4 py-3.5 font-semibold">Faltas reais</th>
                   <th className="px-4 py-3.5 font-semibold">Telefone</th>
                   <th className="px-4 py-3.5 font-semibold">Canal</th>
                   <th className="px-4 py-3.5 font-semibold sm:px-6">Status</th>
@@ -524,7 +525,14 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
                       <td className="px-4 py-3.5 font-medium text-slate-900 sm:px-6 dark:text-slate-100">
                         {candidato.nome}
                       </td>
-                      <td className="px-4 py-3.5 text-slate-600 dark:text-slate-300">{candidato.faltas}</td>
+                      <td className="px-4 py-3.5 text-slate-600 dark:text-slate-300">
+                        {candidato.faltas}
+                        {candidato.faltas_planilha != null && candidato.reposicao ? (
+                          <span className="ml-1 text-[11px] text-slate-400 dark:text-slate-500">
+                            ({candidato.faltas_planilha} − {candidato.reposicao})
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="px-4 py-3.5 font-mono text-xs text-slate-600 dark:text-slate-300">
                         {candidato.numero || '—'}
                       </td>

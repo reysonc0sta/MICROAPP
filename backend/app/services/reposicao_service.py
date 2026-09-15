@@ -10,14 +10,22 @@ from app.services.config_service import (
     renderizar_mensagem,
 )
 from app.services.planilha_io import (
-    COLUNAS_OBRIGATORIAS_FALTAS,
+    NOMES_COLUNA_REPOSICAO,
     celula_int,
     celula_texto,
+    encontrar_coluna,
+    exigir_coluna_faltas,
+    exigir_coluna_nome_aluno,
     ler_planilha_excel,
-    validar_colunas,
+    nome_da_linha,
 )
 
 MIN_FALTAS_DISPARO = 2
+
+
+def calcular_faltas_reais(faltas: int, reposicao: int) -> int:
+    """Faltas reais = faltas da planilha − reposições já feitas (nunca negativo)."""
+    return max(0, int(faltas) - int(reposicao))
 
 
 def montar_candidatos_disparo(caminho_arquivo: str, template: str = TEMPLATE_PADRAO) -> list[dict]:
@@ -27,20 +35,22 @@ def montar_candidatos_disparo(caminho_arquivo: str, template: str = TEMPLATE_PAD
     disparo real, para garantir que os dois mostrem exatamente a mesma coisa.
     """
     df = ler_planilha_excel(caminho_arquivo)
-    validar_colunas(df, COLUNAS_OBRIGATORIAS_FALTAS)
-    df = df.dropna(subset=["Nome Aluno"])
+    colunas_nome = exigir_coluna_nome_aluno(df)
+    coluna_faltas = exigir_coluna_faltas(df)
 
     if "Status Contrato" in df.columns:
         df = df[df["Status Contrato"] == "Ativo"]
 
-    com_faltas = df[df["Faltas"] >= MIN_FALTAS_DISPARO]
+    coluna_reposicao = encontrar_coluna(df, NOMES_COLUNA_REPOSICAO, trecho="reposi")
     candidatos = []
 
-    for _, row in com_faltas.iterrows():
-        nome = celula_texto(row["Nome Aluno"])
+    for _, row in df.iterrows():
+        nome = nome_da_linha(row, colunas_nome)
         if not nome:
             continue
-        faltas = celula_int(row["Faltas"])
+        faltas_planilha = celula_int(row[coluna_faltas])
+        reposicao = celula_int(row[coluna_reposicao]) if coluna_reposicao else 0
+        faltas = calcular_faltas_reais(faltas_planilha, reposicao)
         if faltas < MIN_FALTAS_DISPARO:
             continue
         tel_aluno = celula_texto(row.get("Telefone Aluno"))
@@ -51,6 +61,8 @@ def montar_candidatos_disparo(caminho_arquivo: str, template: str = TEMPLATE_PAD
         candidatos.append({
             "nome": nome,
             "faltas": faltas,
+            "faltas_planilha": faltas_planilha,
+            "reposicao": reposicao,
             "numero": contato["numero"],
             "canal": contato["canal"] if contato["numero"] else None,
             "usou_fallback": contato["usou_fallback"],
