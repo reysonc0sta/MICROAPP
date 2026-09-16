@@ -78,6 +78,7 @@ services:
         condition: service_healthy
       evolution_api:
         condition: service_started
+    # entrypoint.sh: alembic upgrade head e em seguida uvicorn
     networks:
       - microapp_net
 

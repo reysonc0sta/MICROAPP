@@ -1,0 +1,18 @@
+Migrações versionadas do schema Postgres da API (não inclui evolution_db).
+
+Estratégia
+----------
+- Banco NOVO (vazio): `alembic upgrade head` cria o schema completo
+  (7 tabelas da baseline + `logs_auditoria`).
+- Banco EXISTENTE com as 7 tabelas e SEM `logs_auditoria` (caso do
+  Postgres de desenvolvimento inspecionado nesta fase):
+  `alembic stamp 0001_baseline` e depois `alembic upgrade head`
+  (só cria `logs_auditoria`, inclusive `ix_logs_auditoria_id`).
+- Banco EXISTENTE que JÁ tem `logs_auditoria`: `alembic stamp head`
+  (marca as duas revisões como aplicadas, sem CREATE TABLE).
+  Se essa tabela nasceu do SQL manual de `garantir_colunas()`, ela
+  pode não ter `ix_logs_auditoria_id`; stamp head não cria esse índice.
+
+Nunca rode `upgrade head` em um banco com as tabelas da baseline
+sem ter feito `stamp` da baseline — o Alembic tentaria recriar tabelas
+já existentes.

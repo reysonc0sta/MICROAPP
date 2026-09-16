@@ -21,6 +21,7 @@ from app.core.security import (
     get_current_user,
     require_cargos,
 )
+from app.services.auditoria import registrar_log
 
 router = APIRouter()
 
@@ -49,7 +50,7 @@ def _validar_cargo(cargo: str) -> str:
 def cadastrar_usuario(
     dados: UsuarioCreate,
     db: Session = Depends(get_db),
-    _: Usuario = admin_deps,
+    usuario: Usuario = admin_deps,
 ):
     usuario_existente = db.query(Usuario).filter(Usuario.email == dados.email.lower().strip()).first()
     if usuario_existente:
@@ -67,6 +68,15 @@ def cadastrar_usuario(
     db.add(novo_usuario)
     db.commit()
     db.refresh(novo_usuario)
+    registrar_log(
+        db,
+        usuario=usuario,
+        acao="CRIAR",
+        entidade="usuario",
+        entidade_id=novo_usuario.id,
+        descricao=f"Cadastrou usuário {novo_usuario.nome} ({novo_usuario.email}) com cargo {novo_usuario.cargo}",
+        valor_novo={"nome": novo_usuario.nome, "email": novo_usuario.email, "cargo": novo_usuario.cargo},
+    )
     return novo_usuario
 
 
@@ -112,12 +122,15 @@ def editar_usuario(
     usuario_id: int,
     dados: UsuarioUpdate,
     db: Session = Depends(get_db),
-    _: Usuario = admin_deps,
+    atual: Usuario = admin_deps,
 ):
     usuario = _obter_usuario_ou_404(db, usuario_id)
+    anterior = {"nome": usuario.nome, "email": usuario.email, "cargo": usuario.cargo}
+    alterados = {}
 
     if dados.nome is not None:
         usuario.nome = dados.nome.strip()
+        alterados["nome"] = usuario.nome
 
     if dados.email is not None:
         email = dados.email.lower().strip()
@@ -129,12 +142,26 @@ def editar_usuario(
         if conflito:
             raise HTTPException(status_code=400, detail="E-mail já cadastrado no sistema.")
         usuario.email = email
+        alterados["email"] = usuario.email
 
     if dados.cargo is not None:
         usuario.cargo = _validar_cargo(dados.cargo)
+        alterados["cargo"] = usuario.cargo
 
     db.commit()
     db.refresh(usuario)
+    if alterados:
+        campos = ", ".join(alterados.keys())
+        registrar_log(
+            db,
+            usuario=atual,
+            acao="EDITAR",
+            entidade="usuario",
+            entidade_id=usuario.id,
+            descricao=f"Atualizou dados de {usuario.nome} ({campos})",
+            valor_anterior={k: anterior[k] for k in alterados},
+            valor_novo=alterados,
+        )
     return usuario
 
 
@@ -152,9 +179,20 @@ def alterar_status_usuario(
         )
 
     usuario = _obter_usuario_ou_404(db, usuario_id)
+    anterior = usuario.ativo
     usuario.ativo = dados.ativo
     db.commit()
     db.refresh(usuario)
+    registrar_log(
+        db,
+        usuario=atual,
+        acao="EDITAR",
+        entidade="usuario",
+        entidade_id=usuario.id,
+        descricao=f"{'Ativou' if usuario.ativo else 'Desativou'} usuário {usuario.nome}",
+        valor_anterior=str(anterior).lower(),
+        valor_novo="ativo" if usuario.ativo else "inativo",
+    )
     return usuario
 
 
@@ -163,7 +201,7 @@ def redefinir_senha_usuario(
     usuario_id: int,
     dados: RedefinirSenha,
     db: Session = Depends(get_db),
-    _: Usuario = admin_deps,
+    atual: Usuario = admin_deps,
 ):
     if len(dados.nova_senha) < 6:
         raise HTTPException(status_code=400, detail="A senha deve ter no mínimo 6 caracteres.")
@@ -172,6 +210,14 @@ def redefinir_senha_usuario(
     usuario.senha_hash = gerar_hash_senha(dados.nova_senha)
     db.commit()
     db.refresh(usuario)
+    registrar_log(
+        db,
+        usuario=atual,
+        acao="EDITAR",
+        entidade="usuario",
+        entidade_id=usuario.id,
+        descricao=f"Redefiniu senha de {usuario.nome}",
+    )
     return usuario
 
 
@@ -185,6 +231,16 @@ def excluir_usuario(
         raise HTTPException(status_code=400, detail="Você não pode excluir o próprio perfil.")
 
     usuario = _obter_usuario_ou_404(db, usuario_id)
+    snapshot = {"id": usuario.id, "nome": usuario.nome, "email": usuario.email, "cargo": usuario.cargo}
     db.delete(usuario)
     db.commit()
+    registrar_log(
+        db,
+        usuario=atual,
+        acao="EXCLUIR",
+        entidade="usuario",
+        entidade_id=snapshot["id"],
+        descricao=f"Excluiu usuário {snapshot['nome']} ({snapshot['email']})",
+        valor_anterior=snapshot,
+    )
     return None

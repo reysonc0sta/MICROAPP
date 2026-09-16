@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from app.core.database import get_db
 from app.core.security import get_current_user, require_cargos
 from app.models.domain import Usuario
+from app.services.auditoria import registrar_log
 from app.services.config_service import (
     obter_configuracao,
     atualizar_template_mensagem,
@@ -62,7 +63,7 @@ def obter_mensagem(
 def atualizar_mensagem(
     dados: TemplateMensagemIn,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(require_cargos("ADM", "DIRETOR", "ASSISTENTE")),
+    usuario: Usuario = Depends(require_cargos("ADM", "DIRETOR", "ASSISTENTE")),
 ):
     if "{nome}" not in dados.template:
         raise HTTPException(
@@ -78,7 +79,18 @@ def atualizar_mensagem(
             detail="Template inválido. Use apenas os placeholders {nome} e {faltas}.",
         )
 
+    anterior = obter_configuracao(db).template
     config = atualizar_template_mensagem(db, dados.template)
+    registrar_log(
+        db,
+        usuario=usuario,
+        acao="EDITAR",
+        entidade="mensagem_whatsapp",
+        entidade_id=config.id,
+        descricao="Alterou o texto da mensagem de aviso de falta",
+        valor_anterior=anterior,
+        valor_novo=config.template,
+    )
     return _montar_saida(config.template)
 
 
@@ -95,7 +107,7 @@ def obter_mensagem_lembrete(
 def atualizar_mensagem_lembrete(
     dados: TemplateMensagemIn,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(require_cargos("ADM", "DIRETOR", "ASSISTENTE")),
+    usuario: Usuario = Depends(require_cargos("ADM", "DIRETOR", "ASSISTENTE")),
 ):
     if "{nome}" not in dados.template:
         raise HTTPException(
@@ -111,5 +123,16 @@ def atualizar_mensagem_lembrete(
             detail="Template inválido. Use apenas os placeholders {nome} e {turno}.",
         )
 
+    anterior = obter_configuracao(db).template_lembrete or ""
     config = atualizar_template_lembrete(db, dados.template)
+    registrar_log(
+        db,
+        usuario=usuario,
+        acao="EDITAR",
+        entidade="mensagem_whatsapp",
+        entidade_id=config.id,
+        descricao="Alterou o texto da mensagem de lembrete",
+        valor_anterior=anterior,
+        valor_novo=config.template_lembrete,
+    )
     return _montar_saida_lembrete(config.template_lembrete)

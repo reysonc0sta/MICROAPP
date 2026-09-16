@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal, get_db
 from app.core.security import get_current_user, require_cargos
+from app.core.validacao_arquivo import calcular_sha256, validar_magic_number_xlsx
 from app.models.domain import Aluno, Materia, ProvaResultado, Usuario
+from app.services.auditoria import registrar_log
 from app.services.config_service import obter_template_lembrete, obter_template_mensagem
 from app.services.historico_service import registrar_envio_whatsapp
 from app.services.lembrete_service import (
@@ -67,6 +69,13 @@ async def _salvar_upload_seguro(file: UploadFile) -> str:
         if os.path.exists(path):
             os.remove(path)
         raise
+
+    if sufixo == ".xlsx":
+        try:
+            validar_magic_number_xlsx(path)
+        except ValueError as exc:
+            os.remove(path)
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     return path
 
 
@@ -266,6 +275,7 @@ async def disparar_lembretes(
     file: UploadFile = File(...),
     turno: str = Form("TODOS"),
     usuario: Usuario = whatsapp_ops_deps,
+    db: Session = Depends(get_db),
 ):
     instance_name = nome_instancia_usuario(usuario)
     exigir_whatsapp_conectado(instance_name)
@@ -275,7 +285,17 @@ async def disparar_lembretes(
         raise HTTPException(status_code=400, detail="Turno inválido. Use MANHA, TARDE, NOITE ou TODOS.")
 
     temp_path = await _salvar_upload_seguro(file)
+    hash_arquivo = calcular_sha256(temp_path)
     background_tasks.add_task(_job_disparar_lembretes, temp_path, turno_norm, instance_name)
+    registrar_log(
+        db,
+        usuario=usuario,
+        acao="UPLOAD",
+        entidade="whatsapp",
+        entidade_id=None,
+        descricao=f'Disparou lembretes do turno {turno_norm} com a planilha "{file.filename}"',
+        valor_novo={"nome_arquivo": file.filename, "turno": turno_norm, "sha256": hash_arquivo},
+    )
 
     return {
         "mensagem": f"Lembretes do turno {turno_norm} iniciados em segundo plano. O histórico será gravado no banco.",
@@ -291,11 +311,22 @@ async def upload_planilha(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     usuario: Usuario = whatsapp_ops_deps,
+    db: Session = Depends(get_db),
 ):
     instance_name = nome_instancia_usuario(usuario)
     exigir_whatsapp_conectado(instance_name)
     temp_path = await _salvar_upload_seguro(file)
+    hash_arquivo = calcular_sha256(temp_path)
     background_tasks.add_task(_job_disparar_faltas, temp_path, instance_name)
+    registrar_log(
+        db,
+        usuario=usuario,
+        acao="UPLOAD",
+        entidade="whatsapp",
+        entidade_id=None,
+        descricao=f'Disparou mensagens de falta com a planilha "{file.filename}"',
+        valor_novo={"nome_arquivo": file.filename, "sha256": hash_arquivo},
+    )
     return {
         "mensagem": "Disparo de reposição iniciado em segundo plano. O histórico será gravado no banco.",
         "status": "PROCESSANDO",

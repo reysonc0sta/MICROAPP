@@ -17,7 +17,14 @@ Base.metadata.create_all(bind=engine)
 
 
 def garantir_colunas():
-    """Adiciona colunas novas em bancos já existentes (create_all não altera tabelas)."""
+    """LEGADO / CONGELADO — não adicionar schema novo aqui.
+
+    Estas ALTER/CREATE cobrem bancos que ainda não passaram pelo Alembic
+    (create_all não altera tabelas existentes). A partir de agora, qualquer
+    mudança de schema vai só via `alembic revision` + `alembic upgrade`.
+    Não remover estes patches até todos os ambientes estarem em `alembic stamp`
+    ou `upgrade` com a baseline aplicada.
+    """
     with engine.begin() as conn:
         existe_lembrete = conn.execute(
             text(
@@ -57,6 +64,40 @@ def garantir_colunas():
         ).scalar()
         if aluno_nullable == "NO":
             conn.execute(text("ALTER TABLE historico_mensagens ALTER COLUMN aluno_id DROP NOT NULL"))
+
+        existe_logs = conn.execute(
+            text(
+                """
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name = 'logs_auditoria'
+                """
+            )
+        ).scalar()
+        if not existe_logs:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE logs_auditoria (
+                        id SERIAL PRIMARY KEY,
+                        usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+                        usuario_nome VARCHAR(255) NOT NULL,
+                        acao VARCHAR(20) NOT NULL,
+                        entidade VARCHAR(50),
+                        entidade_id INTEGER,
+                        descricao TEXT NOT NULL,
+                        valor_anterior TEXT,
+                        valor_novo TEXT,
+                        data_hora TIMESTAMP WITHOUT TIME ZONE NOT NULL
+                    )
+                    """
+                )
+            )
+            conn.execute(text("CREATE INDEX ix_logs_auditoria_usuario_id ON logs_auditoria (usuario_id)"))
+            conn.execute(text("CREATE INDEX ix_logs_auditoria_acao ON logs_auditoria (acao)"))
+            conn.execute(text("CREATE INDEX ix_logs_auditoria_entidade ON logs_auditoria (entidade)"))
+            conn.execute(text("CREATE INDEX ix_logs_auditoria_entidade_id ON logs_auditoria (entidade_id)"))
+            conn.execute(text("CREATE INDEX ix_logs_auditoria_data_hora ON logs_auditoria (data_hora)"))
 
 
 def garantir_admin_inicial():

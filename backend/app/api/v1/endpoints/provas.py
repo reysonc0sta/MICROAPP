@@ -10,8 +10,10 @@ from typing import List
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_cargos
-from app.models.domain import ProvaResultado, AlunoMateria, Usuario
+from app.core.validacao_arquivo import calcular_sha256, validar_magic_number_xlsx
+from app.models.domain import Aluno, AlunoMateria, Materia, ProvaResultado, Usuario
 from app.schemas.schemas import LancarNota, ProvaOut, RelatorioPosProvaOut
+from app.services.auditoria import registrar_log
 from app.services.provas_pdf import gerar_pdf_pos_prova
 from app.services.provas_planilha import processar_planilha_pos_prova
 
@@ -35,7 +37,7 @@ def listar_provas(
 def lancar_nota(
     dados: LancarNota,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(require_cargos("ADM", "DIRETOR", "PROFESSOR")),
+    usuario: Usuario = Depends(require_cargos("ADM", "DIRETOR", "PROFESSOR")),
 ):
     vinculo = db.query(AlunoMateria).filter(
         AlunoMateria.aluno_id == dados.aluno_id,
@@ -44,6 +46,11 @@ def lancar_nota(
 
     if not vinculo:
         raise HTTPException(status_code=400, detail="Aluno não possui esta matéria vinculada na grade.")
+
+    aluno = db.query(Aluno).filter(Aluno.id == dados.aluno_id).first()
+    materia = db.query(Materia).filter(Materia.id == dados.materia_id).first()
+    nome_aluno = aluno.nome if aluno else f"#{dados.aluno_id}"
+    nome_materia = materia.nome if materia else f"#{dados.materia_id}"
 
     total_tentativas = db.query(ProvaResultado).filter(
         ProvaResultado.aluno_id == dados.aluno_id,
@@ -59,6 +66,18 @@ def lancar_nota(
     db.add(nova_prova)
     db.commit()
     db.refresh(nova_prova)
+    registrar_log(
+        db,
+        usuario=usuario,
+        acao="CRIAR",
+        entidade="nota",
+        entidade_id=nova_prova.id,
+        descricao=(
+            f"Lançou nota {nova_prova.nota} ({nova_prova.tentativa}ª tentativa) "
+            f"para {nome_aluno} em {nome_materia}"
+        ),
+        valor_novo=str(nova_prova.nota),
+    )
     return nova_prova
 
 
@@ -81,23 +100,42 @@ async def _salvar_upload_xlsx(file: UploadFile) -> str:
         if os.path.exists(path):
             os.remove(path)
         raise
+
+    try:
+        validar_magic_number_xlsx(path)
+    except ValueError as exc:
+        os.remove(path)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return path
 
 
 @router.post("/upload", response_model=RelatorioPosProvaOut)
 async def upload_planilha_pos_prova(
     file: UploadFile = File(...),
-    _: Usuario = relatorio_deps,
+    usuario: Usuario = relatorio_deps,
+    db: Session = Depends(get_db),
 ):
     """Extrai Pós prova de um Histórico de Contratos. Não persiste e não exige aluno cadastrado."""
     temp_path = await _salvar_upload_xlsx(file)
+    hash_arquivo = calcular_sha256(temp_path)
     try:
-        return await asyncio.to_thread(processar_planilha_pos_prova, temp_path)
+        relatorio = await asyncio.to_thread(processar_planilha_pos_prova, temp_path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
+    registrar_log(
+        db,
+        usuario=usuario,
+        acao="UPLOAD",
+        entidade="prova",
+        entidade_id=None,
+        descricao=f'Processou planilha de pós-prova "{file.filename}"',
+        valor_novo={"nome_arquivo": file.filename, "sha256": hash_arquivo},
+    )
+    return relatorio
 
 
 @router.post("/exportar-pdf")

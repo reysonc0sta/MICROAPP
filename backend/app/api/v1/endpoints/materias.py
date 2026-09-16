@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user, require_cargos
 from app.models.domain import Materia, AlunoMateria, ProvaResultado, Usuario
 from app.schemas.schemas import MateriaCreate, MateriaUpdate, MateriaOut
+from app.services.auditoria import registrar_log
 
 router = APIRouter()
 admin_deps = Depends(require_cargos("ADM", "DIRETOR"))
@@ -47,7 +48,7 @@ def obter_materia(
 def criar_materia(
     dados: MateriaCreate,
     db: Session = Depends(get_db),
-    _: Usuario = admin_deps,
+    usuario: Usuario = admin_deps,
 ):
     nova = Materia(nome=_nome_normalizado(dados.nome))
     db.add(nova)
@@ -57,6 +58,15 @@ def criar_materia(
         db.rollback()
         raise HTTPException(status_code=400, detail="Já existe uma matéria com este nome.") from exc
     db.refresh(nova)
+    registrar_log(
+        db,
+        usuario=usuario,
+        acao="CRIAR",
+        entidade="materia",
+        entidade_id=nova.id,
+        descricao=f"Cadastrou matéria {nova.nome}",
+        valor_novo={"nome": nova.nome},
+    )
     return nova
 
 
@@ -65,13 +75,14 @@ def atualizar_materia(
     materia_id: int,
     dados: MateriaUpdate,
     db: Session = Depends(get_db),
-    _: Usuario = admin_deps,
+    usuario: Usuario = admin_deps,
 ):
     materia = _obter_materia_ou_404(db, materia_id)
     payload = dados.model_dump(exclude_unset=True)
     if "nome" not in payload:
         return materia
 
+    anterior = materia.nome
     materia.nome = _nome_normalizado(payload["nome"])
     try:
         db.commit()
@@ -79,6 +90,16 @@ def atualizar_materia(
         db.rollback()
         raise HTTPException(status_code=400, detail="Já existe uma matéria com este nome.") from exc
     db.refresh(materia)
+    registrar_log(
+        db,
+        usuario=usuario,
+        acao="EDITAR",
+        entidade="materia",
+        entidade_id=materia.id,
+        descricao=f"Renomeou matéria {anterior} para {materia.nome}",
+        valor_anterior=anterior,
+        valor_novo=materia.nome,
+    )
     return materia
 
 
@@ -86,7 +107,7 @@ def atualizar_materia(
 def excluir_materia(
     materia_id: int,
     db: Session = Depends(get_db),
-    _: Usuario = admin_deps,
+    usuario: Usuario = admin_deps,
 ):
     materia = _obter_materia_ou_404(db, materia_id)
 
@@ -98,6 +119,16 @@ def excluir_materia(
             detail="Não é possível excluir: a matéria está vinculada a alunos ou provas.",
         )
 
+    snapshot = {"id": materia.id, "nome": materia.nome}
     db.delete(materia)
     db.commit()
+    registrar_log(
+        db,
+        usuario=usuario,
+        acao="EXCLUIR",
+        entidade="materia",
+        entidade_id=snapshot["id"],
+        descricao=f"Excluiu matéria {snapshot['nome']}",
+        valor_anterior=snapshot,
+    )
     return None

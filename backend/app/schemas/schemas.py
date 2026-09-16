@@ -135,3 +135,26 @@ class TokenSchema(BaseModel):
     access_token: str
     token_type: str = "bearer"
     usuario: UsuarioOut
+
+
+class LogAuditoriaOut(BaseModel):
+    id: int
+    usuario_id: Optional[int] = None
+    usuario_nome: str
+    acao: str
+    entidade: Optional[str] = None
+    entidade_id: Optional[int] = None
+    descricao: str
+    valor_anterior: Optional[str] = None
+    valor_novo: Optional[str] = None
+    data_hora: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PaginatedAuditoria(BaseModel):
+    items: list[LogAuditoriaOut]
+    total: int
+    page: int
+    page_size: int

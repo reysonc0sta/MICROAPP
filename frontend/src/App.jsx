@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Login } from './features/auth/Login';
 import { ImportarPlanilha } from './features/whatsapp/ImportarPlanilha';
 import { DispararLembretes } from './features/whatsapp/DispararLembretes';
 import { CadastroUsuario } from './features/admin/CadastroUsuario';
 import { CadastroMateria } from './features/admin/CadastroMateria';
+import { Auditoria } from './features/admin/Auditoria';
 import { ConectarWhatsapp } from './features/whatsapp/ConectarWhatsapp';
 import { AcompanhamentoModulos } from './features/acompanhamento/AcompanhamentoModulos';
 import { Alunos } from './features/alunos/Alunos';
@@ -29,6 +30,12 @@ export default function App() {
     setMenuAberto(false);
   };
 
+  useEffect(() => {
+    if (usuario && abaAtiva === 'auditoria' && usuario.cargo !== 'ADM') {
+      setAbaAtiva('conectar');
+    }
+  }, [abaAtiva, usuario]);
+
   if (validandoSessao) {
     return (
       <div className="app-shell flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
@@ -42,6 +49,7 @@ export default function App() {
   }
 
   const ehAdmin = ['ADM', 'DIRETOR'].includes(usuario.cargo);
+  const ehAdmSistema = usuario.cargo === 'ADM';
   const podeVerProvas = ['ADM', 'DIRETOR', 'PROFESSOR', 'ASSISTENTE'].includes(usuario.cargo);
 
   return (
@@ -83,6 +91,7 @@ export default function App() {
         ) : null}
         {abaAtiva === 'modulos' ? <AcompanhamentoModulos /> : null}
         {abaAtiva === 'usuarios' && ehAdmin ? <CadastroUsuario /> : null}
+        {abaAtiva === 'auditoria' && ehAdmSistema ? <Auditoria /> : null}
       </main>
     </div>
   );

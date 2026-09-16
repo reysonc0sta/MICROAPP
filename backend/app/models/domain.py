@@ -95,3 +95,18 @@ class Usuario(Base):
     )
     ativo = Column(Boolean, default=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
+
+
+class LogAuditoria(Base):
+    __tablename__ = "logs_auditoria"
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    usuario_nome = Column(String(255), nullable=False)
+    acao = Column(String(20), nullable=False, index=True)
+    entidade = Column(String(50), nullable=True, index=True)
+    entidade_id = Column(Integer, nullable=True, index=True)
+    descricao = Column(Text, nullable=False)
+    valor_anterior = Column(Text, nullable=True)
+    valor_novo = Column(Text, nullable=True)
+    data_hora = Column(DateTime, nullable=False, index=True)

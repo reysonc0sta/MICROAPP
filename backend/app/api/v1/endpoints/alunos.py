@@ -6,6 +6,7 @@ from app.core.database import get_db
 from app.core.security import require_cargos
 from app.models.domain import Aluno, AlunoMateria, Materia, Usuario
 from app.schemas.schemas import AlunoCreate, AlunoOut, MateriaOut, MateriaVinculo, PaginatedAlunos
+from app.services.auditoria import registrar_log
 
 router = APIRouter()
 grade_deps = Depends(require_cargos("ADM", "DIRETOR", "PROFESSOR"))
@@ -24,12 +25,26 @@ def _obter_aluno_ou_404(db: Session, aluno_id: int) -> Aluno:
 def criar_aluno(
     dados: AlunoCreate,
     db: Session = Depends(get_db),
-    _: Usuario = cadastro_deps,
+    usuario: Usuario = cadastro_deps,
 ):
     novo_aluno = Aluno(**dados.model_dump())
     db.add(novo_aluno)
     db.commit()
     db.refresh(novo_aluno)
+    registrar_log(
+        db,
+        usuario=usuario,
+        acao="CRIAR",
+        entidade="aluno",
+        entidade_id=novo_aluno.id,
+        descricao=f"Cadastrou aluno {novo_aluno.nome}",
+        valor_novo={
+            "nome": novo_aluno.nome,
+            "turno": novo_aluno.turno,
+            "telefone_pessoal": novo_aluno.telefone_pessoal,
+            "telefone_comercial": novo_aluno.telefone_comercial,
+        },
+    )
     return novo_aluno
 
 
@@ -76,9 +91,9 @@ def vincular_materia(
     aluno_id: int,
     dados: MateriaVinculo,
     db: Session = Depends(get_db),
-    _: Usuario = grade_deps,
+    usuario: Usuario = grade_deps,
 ):
-    _obter_aluno_ou_404(db, aluno_id)
+    aluno = _obter_aluno_ou_404(db, aluno_id)
     materia = db.query(Materia).filter(Materia.id == dados.materia_id).first()
     if not materia:
         raise HTTPException(status_code=404, detail="Matéria não encontrada.")
@@ -93,4 +108,13 @@ def vincular_materia(
 
     db.add(AlunoMateria(aluno_id=aluno_id, materia_id=dados.materia_id))
     db.commit()
+    registrar_log(
+        db,
+        usuario=usuario,
+        acao="EDITAR",
+        entidade="aluno",
+        entidade_id=aluno.id,
+        descricao=f"Vinculou matéria {materia.nome} à grade de {aluno.nome}",
+        valor_novo={"materia_id": materia.id, "materia_nome": materia.nome},
+    )
     return materia

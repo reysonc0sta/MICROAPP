@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   GraduationCap,
   QrCode,
+  ScrollText,
   UserPlus,
 } from 'lucide-react';
 
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   },
   { id: 'materias', label: 'Matérias', icon: BookMarked, cargos: ['ADM', 'DIRETOR'] },
   { id: 'usuarios', label: 'Gestão de Acessos', icon: UserPlus, cargos: ['ADM', 'DIRETOR'] },
+  { id: 'auditoria', label: 'Auditoria', icon: ScrollText, cargos: ['ADM'] },
   {
     id: 'lembretes',
     label: 'Lembretes',
