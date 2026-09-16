@@ -158,3 +158,50 @@ class PaginatedAuditoria(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class AlunoPacoteOut(BaseModel):
+    nome: str
+    educador: Optional[str] = None
+    dias_agendamento: Optional[str] = None
+    dias_normalizados: list[str] = []
+    horas_agendamento: Optional[str] = None
+    qtd_realizada: int = 0
+    qtd_agendamento: int = 0
+    qtd_aula_extra: int = 0
+    aulas_por_ocorrencia_do_dia: Optional[int] = None
+    total_previsto_mes: Optional[int] = None
+    previsto_ate_hoje: Optional[int] = None
+    status: Optional[str] = None
+    diferenca: Optional[int] = None
+    aviso: Optional[str] = None
+
+
+class FeriadoPacoteOut(BaseModel):
+    data: str
+    nome: str
+
+
+class AvisoPacoteOut(BaseModel):
+    nome: str
+    educador: Optional[str] = None
+    motivo: str
+
+
+class GruposPacoteOut(BaseModel):
+    seg_qua: list[AlunoPacoteOut]
+    ter_qui: list[AlunoPacoteOut]
+    sabado: list[AlunoPacoteOut]
+
+
+class RelatorioPacotesOut(BaseModel):
+    ano: int
+    mes: int
+    dia_atual: int
+    dias_totais_mes: int
+    feriados_aplicados: list[FeriadoPacoteOut]
+    grupos: GruposPacoteOut
+    nao_agrupados: list[AlunoPacoteOut]
+    avisos: list[AvisoPacoteOut]
+    total_alunos: int
+    rotulos_grupo: dict[str, str]

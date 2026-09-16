@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import alunos, provas, whatsapp, usuarios, configuracoes, materias, auditoria
+from app.api.v1.endpoints import alunos, provas, whatsapp, usuarios, configuracoes, materias, auditoria, pacotes
 
 api_router = APIRouter()
 
@@ -14,3 +14,4 @@ api_router.include_router(usuarios.router, prefix="/usuarios", tags=["Usuários 
 api_router.include_router(configuracoes.router, prefix="/configuracoes", tags=["Configurações"])
 api_router.include_router(materias.router, prefix="/materias", tags=["Matérias"])
 api_router.include_router(auditoria.router, prefix="/auditoria", tags=["Auditoria"])
+api_router.include_router(pacotes.router, prefix="/pacotes", tags=["Pacotes"])

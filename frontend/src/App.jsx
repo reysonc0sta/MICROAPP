@@ -9,6 +9,7 @@ import { ConectarWhatsapp } from './features/whatsapp/ConectarWhatsapp';
 import { AcompanhamentoModulos } from './features/acompanhamento/AcompanhamentoModulos';
 import { Alunos } from './features/alunos/Alunos';
 import { RelatorioProvas } from './features/provas/RelatorioProvas';
+import { GestaoPacotes } from './features/pacotes/GestaoPacotes';
 import { Header } from './components/Header';
 import { NavTabs } from './components/NavTabs';
 import { useSessao } from './hooks/useSessao';
@@ -31,7 +32,14 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (usuario && abaAtiva === 'auditoria' && usuario.cargo !== 'ADM') {
+    if (!usuario) return;
+    if (abaAtiva === 'auditoria' && usuario.cargo !== 'ADM') {
+      setAbaAtiva('conectar');
+    }
+    if (
+      abaAtiva === 'pacotes' &&
+      !['ADM', 'DIRETOR', 'PROFESSOR', 'ASSISTENTE'].includes(usuario.cargo)
+    ) {
       setAbaAtiva('conectar');
     }
   }, [abaAtiva, usuario]);
@@ -51,6 +59,7 @@ export default function App() {
   const ehAdmin = ['ADM', 'DIRETOR'].includes(usuario.cargo);
   const ehAdmSistema = usuario.cargo === 'ADM';
   const podeVerProvas = ['ADM', 'DIRETOR', 'PROFESSOR', 'ASSISTENTE'].includes(usuario.cargo);
+  const podeVerPacotes = podeVerProvas;
 
   return (
     <div className="app-shell font-sans text-slate-900 dark:text-slate-50">
@@ -82,6 +91,7 @@ export default function App() {
         ) : null}
         {abaAtiva === 'alunos' ? <Alunos cargoUsuario={usuario.cargo} /> : null}
         {abaAtiva === 'provas' && podeVerProvas ? <RelatorioProvas /> : null}
+        {abaAtiva === 'pacotes' && podeVerPacotes ? <GestaoPacotes /> : null}
         {abaAtiva === 'materias' && ehAdmin ? <CadastroMateria /> : null}
         {abaAtiva === 'lembretes' ? (
           <DispararLembretes
