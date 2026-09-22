@@ -67,6 +67,7 @@ def test_processar_disparos_grava_historico_sem_banco_real(planilha_faltas, db_m
     with (
         patch("app.services.reposicao_service.obter_template_mensagem", return_value="Olá, {nome}! {faltas} falta(s)."),
         patch("app.services.reposicao_service.disparar_mensagem_real", return_value=True) as disparar,
+        patch("app.services.reposicao_service.whatsapp_esta_conectado", return_value=True),
         patch("app.services.reposicao_service.registrar_envio_whatsapp") as registrar,
     ):
         resultado = processar_disparos_faltas_excel(planilha_faltas, db_mock, "user_1")

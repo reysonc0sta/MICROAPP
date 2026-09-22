@@ -2,7 +2,12 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.services.telefones import candidatos_envio, obter_telefone_envio
-from app.services.whatsapp_service import disparar_mensagem_real
+from app.services.whatsapp_service import (
+    aguardar_entre_envios,
+    deve_checar_conexao,
+    disparar_mensagem_real,
+    whatsapp_esta_conectado,
+)
 from app.services.historico_service import registrar_envio_whatsapp
 from app.services.disparo_jobs import deve_parar, finalizar_job
 from app.services.config_service import (
@@ -107,6 +112,8 @@ def processar_disparos_faltas_excel(
     total_sucesso = 0
     total_falha = 0
     cancelado = False
+    desconectado = False
+    processados = 0
 
     try:
         for candidato in candidatos:
@@ -116,6 +123,13 @@ def processar_disparos_faltas_excel(
 
             if not candidato["valido"]:
                 continue
+
+            if deve_checar_conexao(processados) and not whatsapp_esta_conectado(instance_name):
+                desconectado = True
+                break
+
+            if processados > 0:
+                aguardar_entre_envios(processados)
 
             canais = candidato.get("canais") or candidatos_envio(
                 candidato.get("tel_aluno"), candidato.get("tel_resp")
@@ -136,11 +150,14 @@ def processar_disparos_faltas_excel(
                 numero_usado = canal["numero"]
                 usou_fallback = canal["usou_fallback"]
 
+            processados += 1
             status = "SUCESSO" if enviado else "FALHA_AMBOS"
             if enviado:
                 total_sucesso += 1
             else:
                 total_falha += 1
+                if not whatsapp_esta_conectado(instance_name):
+                    desconectado = True
 
             registrar_envio_whatsapp(
                 db,
@@ -161,13 +178,20 @@ def processar_disparos_faltas_excel(
                 "respondido": False,
                 "horario_envio": datetime.now(),
             })
+
+            if desconectado:
+                break
     finally:
-        finalizar_job(job_id, cancelado=cancelado)
+        if desconectado:
+            finalizar_job(job_id, status="DESCONECTADO")
+        else:
+            finalizar_job(job_id, cancelado=cancelado)
 
     return {
         "total_disparados": len(resultados_envio),
         "total_sucesso": total_sucesso,
         "total_falha": total_falha,
         "cancelado": cancelado,
+        "desconectado": desconectado,
         "detalhes": resultados_envio,
     }

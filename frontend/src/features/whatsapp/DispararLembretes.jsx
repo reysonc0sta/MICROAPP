@@ -91,6 +91,44 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao, cargoUsu
     return () => URL.revokeObjectURL(url);
   }, [imagem]);
 
+  useEffect(() => {
+    const jobId = resultado?.job_id;
+    if (!jobId || resultado?.status !== 'PROCESSANDO') {
+      return undefined;
+    }
+
+    let ativo = true;
+    const poll = async () => {
+      try {
+        const { data } = await api.get(`/whatsapp/status-disparo/${jobId}`);
+        if (!ativo || !data?.status || data.status === 'PROCESSANDO') return;
+        setResultado((atual) => {
+          if (!atual || atual.job_id !== jobId) return atual;
+          const mensagens = {
+            CONCLUIDO: 'Disparo concluído.',
+            CANCELADO: 'Disparo cancelado. Os envios restantes não serão feitos.',
+            DESCONECTADO:
+              'WhatsApp desconectou no meio do disparo. Reconecte pelo QR Code e dispare o restante em lotes menores (por turno).',
+          };
+          return {
+            ...atual,
+            status: data.status,
+            mensagem: mensagens[data.status] || atual.mensagem,
+          };
+        });
+      } catch {
+        // Mantém PROCESSANDO; próxima tentativa do intervalo.
+      }
+    };
+
+    const id = window.setInterval(poll, 4000);
+    poll();
+    return () => {
+      ativo = false;
+      window.clearInterval(id);
+    };
+  }, [resultado?.job_id, resultado?.status]);
+
   const limparEstadoArquivo = () => {
     setArquivo(null);
     setPreview(null);
@@ -528,6 +566,14 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao, cargoUsu
             ) : null}
           </div>
 
+          {preview.total_validos > 50 ? (
+            <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 sm:px-6 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
+              Lista grande ({preview.total_validos}). O envio usa pausas entre mensagens para reduzir risco de
+              o WhatsApp desconectar o aparelho. Prefira disparar por turno e evite imagem se a lista passar de
+              ~100 contatos.
+            </div>
+          ) : null}
+
           <div className="w-full overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
@@ -565,13 +611,13 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao, cargoUsu
       {resultado ? (
         <div
           className={`rounded-2xl border p-4 text-sm ${
-            resultado.status === 'CANCELADO'
+            resultado.status === 'CANCELADO' || resultado.status === 'DESCONECTADO'
               ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
               : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
           }`}
         >
           <div className="mb-1 flex flex-wrap items-center gap-2 font-bold">
-            {resultado.status === 'CANCELADO' ? (
+            {resultado.status === 'CANCELADO' || resultado.status === 'DESCONECTADO' ? (
               <Ban size={18} className="text-amber-600" />
             ) : (
               <CheckCircle size={18} className="text-emerald-600" />
@@ -580,7 +626,7 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao, cargoUsu
           </div>
           <p
             className={`text-xs ${
-              resultado.status === 'CANCELADO'
+              resultado.status === 'CANCELADO' || resultado.status === 'DESCONECTADO'
                 ? 'text-amber-800 dark:text-amber-300'
                 : 'text-emerald-700 dark:text-emerald-400'
             }`}
@@ -593,9 +639,11 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao, cargoUsu
               </>
             ) : null}
             {resultado.status === 'PROCESSANDO' ? (
-              <> | Status: <strong>em segundo plano</strong></>
+              <> | Status: <strong>em segundo plano (com pausas entre envios)</strong></>
             ) : resultado.status === 'CANCELADO' ? (
               <> | Status: <strong>cancelado</strong></>
+            ) : resultado.status === 'DESCONECTADO' ? (
+              <> | Status: <strong>interrompido — WhatsApp desconectou</strong></>
             ) : (
               <>
                 {' '}

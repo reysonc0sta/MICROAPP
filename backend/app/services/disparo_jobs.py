@@ -18,7 +18,8 @@ class DisparoJob:
     usuario_id: int
     tipo: str
     cancelado: bool = False
-    status: str = "PROCESSANDO"  # PROCESSANDO | CONCLUIDO | CANCELADO
+    # PROCESSANDO | CONCLUIDO | CANCELADO | DESCONECTADO
+    status: str = "PROCESSANDO"
     criado_em: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -60,7 +61,12 @@ def deve_parar(job_id: str | None) -> bool:
         return bool(job and job.cancelado)
 
 
-def finalizar_job(job_id: str | None, *, cancelado: bool = False) -> None:
+def finalizar_job(
+    job_id: str | None,
+    *,
+    cancelado: bool = False,
+    status: str | None = None,
+) -> None:
     if not job_id:
         return
     with _lock:
@@ -70,5 +76,7 @@ def finalizar_job(job_id: str | None, *, cancelado: bool = False) -> None:
         if cancelado or job.cancelado:
             job.cancelado = True
             job.status = "CANCELADO"
+        elif status:
+            job.status = status
         elif job.status == "PROCESSANDO":
             job.status = "CONCLUIDO"

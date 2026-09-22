@@ -3,6 +3,12 @@ import os
 os.environ.setdefault("DATABASE_URL", "postgresql://user:pass@localhost:5432/test")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("EVOLUTION_API_KEY", "test-evolution-key")
+# Sem pausas reais nos testes unitários.
+os.environ.setdefault("WHATSAPP_DELAY_ENTRE_MS", "0")
+os.environ.setdefault("WHATSAPP_DELAY_JITTER_MS", "0")
+os.environ.setdefault("WHATSAPP_PAUSA_LOTE_A_CADA", "0")
+os.environ.setdefault("WHATSAPP_PAUSA_LOTE_MS", "0")
+os.environ.setdefault("WHATSAPP_CHECK_CONEXAO_A_CADA", "0")
 
 import pytest
 from unittest.mock import MagicMock

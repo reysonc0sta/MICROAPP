@@ -1,5 +1,6 @@
 import base64
 import io
+import random
 import re
 import time
 
@@ -16,6 +17,48 @@ API_KEY = settings.EVOLUTION_API_KEY
 MENSAGEM_DESCONECTADO = (
     "WhatsApp desconectado. Conecte o aparelho pelo QR Code antes de enviar planilhas ou disparar mensagens."
 )
+
+
+def _presence_delay_ms() -> int:
+    return max(0, int(getattr(settings, "WHATSAPP_PRESENCE_DELAY_MS", 1500) or 0))
+
+
+def aguardar_entre_envios(indice_processado: int) -> None:
+    """Pausa entre destinatários + pausa extra a cada lote (anti-ban).
+
+    ``indice_processado`` é 1-based (após o 1º envio, antes do 2º, etc.).
+    Não dorme antes do primeiro destinatário.
+    """
+    if indice_processado <= 0:
+        return
+
+    base_ms = max(0, int(getattr(settings, "WHATSAPP_DELAY_ENTRE_MS", 0) or 0))
+    jitter_ms = max(0, int(getattr(settings, "WHATSAPP_DELAY_JITTER_MS", 0) or 0))
+    espera_ms = base_ms + (random.randint(0, jitter_ms) if jitter_ms else 0)
+    if espera_ms > 0:
+        time.sleep(espera_ms / 1000.0)
+
+    lote_a_cada = max(0, int(getattr(settings, "WHATSAPP_PAUSA_LOTE_A_CADA", 0) or 0))
+    lote_ms = max(0, int(getattr(settings, "WHATSAPP_PAUSA_LOTE_MS", 0) or 0))
+    if lote_a_cada > 0 and lote_ms > 0 and indice_processado % lote_a_cada == 0:
+        time.sleep(lote_ms / 1000.0)
+
+
+def deve_checar_conexao(indice_processado: int) -> bool:
+    """True no 1º destinatário e a cada N envios. ``0`` desliga a checagem periódica."""
+    a_cada = max(0, int(getattr(settings, "WHATSAPP_CHECK_CONEXAO_A_CADA", 0) or 0))
+    if a_cada <= 0:
+        return False
+    return indice_processado == 0 or (indice_processado % a_cada == 0)
+
+
+def carregar_imagem_base64(caminho_imagem: str) -> str | None:
+    try:
+        with open(caminho_imagem, "rb") as fh:
+            return base64.b64encode(fh.read()).decode("ascii")
+    except OSError as exc:
+        print(f"[ERRO EVOLUTION] Não foi possível ler a imagem {caminho_imagem}: {exc}")
+        return None
 
 
 def nome_instancia_usuario(usuario: Usuario | int) -> str:
@@ -332,11 +375,12 @@ def conectar_whatsapp(instance_name: str, forcar_novo: bool = False) -> dict:
 def disparar_mensagem_real(numero: str, texto: str, instance_name: str) -> bool:
     """Envia uma mensagem de texto via Evolution API (POST /message/sendText/{instance})."""
     url = f"{EVOLUTION_URL}/message/sendText/{instance_name}"
+    presence_delay = _presence_delay_ms()
     payload = {
         "number": numero,
         "text": texto,
         "options": {
-            "delay": 1200,
+            "delay": presence_delay,
             "presence": "composing",
         },
         "textMessage": {
@@ -350,6 +394,11 @@ def disparar_mensagem_real(numero: str, texto: str, instance_name: str) -> bool:
             headers=_headers(),
             timeout=15,
         )
+        if response.status_code not in (200, 201):
+            print(
+                f"[ERRO EVOLUTION] sendText {numero} HTTP {response.status_code}: "
+                f"{(response.text or '')[:300]}"
+            )
         return response.status_code in (200, 201)
     except requests.Timeout as exc:
         print(f"[ERRO EVOLUTION] Timeout (15s) ao enviar para {numero}: {exc}")
@@ -369,14 +418,14 @@ def disparar_imagem_real(
     instance_name: str,
     mimetype: str = "image/jpeg",
     file_name: str = "imagem.jpg",
+    media_base64: str | None = None,
 ) -> bool:
     """Envia imagem com legenda via Evolution API (POST /message/sendMedia/{instance})."""
-    try:
-        with open(caminho_imagem, "rb") as fh:
-            encoded = base64.b64encode(fh.read()).decode("ascii")
-    except OSError as exc:
-        print(f"[ERRO EVOLUTION] Não foi possível ler a imagem {caminho_imagem}: {exc}")
-        return False
+    encoded = media_base64
+    if not encoded:
+        encoded = carregar_imagem_base64(caminho_imagem)
+        if not encoded:
+            return False
 
     media = f"data:{mimetype};base64,{encoded}"
     url = f"{EVOLUTION_URL}/message/sendMedia/{instance_name}"
@@ -387,7 +436,7 @@ def disparar_imagem_real(
         "caption": caption or "",
         "media": media,
         "fileName": file_name,
-        "delay": 1200,
+        "delay": _presence_delay_ms(),
     }
     try:
         response = requests.post(
@@ -396,6 +445,11 @@ def disparar_imagem_real(
             headers=_headers(),
             timeout=60,
         )
+        if response.status_code not in (200, 201):
+            print(
+                f"[ERRO EVOLUTION] sendMedia {numero} HTTP {response.status_code}: "
+                f"{(response.text or '')[:300]}"
+            )
         return response.status_code in (200, 201)
     except requests.Timeout as exc:
         print(f"[ERRO EVOLUTION] Timeout ao enviar imagem para {numero}: {exc}")
@@ -415,15 +469,17 @@ def enviar_lembrete(
     caminho_imagem: str | None = None,
     mimetype: str | None = None,
     file_name: str | None = None,
+    media_base64: str | None = None,
 ) -> bool:
     """Envia lembrete: imagem+legenda se houver mídia; senão só texto."""
-    if caminho_imagem:
+    if caminho_imagem or media_base64:
         return disparar_imagem_real(
             numero,
-            caminho_imagem,
+            caminho_imagem or "",
             texto,
             instance_name,
             mimetype=mimetype or "image/jpeg",
             file_name=file_name or "lembrete.jpg",
+            media_base64=media_base64,
         )
     return disparar_mensagem_real(numero, texto, instance_name)

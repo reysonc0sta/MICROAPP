@@ -21,6 +21,16 @@ class Settings(BaseSettings):
     EVOLUTION_API_URL: str = "http://evolution_api:8080"
     EVOLUTION_API_KEY: str
     EVOLUTION_INSTANCE_NAME: str = "hub_escola"
+    # Intervalo entre destinatários no disparo em massa (anti-ban WhatsApp/Baileys).
+    WHATSAPP_DELAY_ENTRE_MS: int = 4000
+    WHATSAPP_DELAY_JITTER_MS: int = 2000
+    # Pausa extra a cada N destinatários processados (0 = desliga).
+    WHATSAPP_PAUSA_LOTE_A_CADA: int = 40
+    WHATSAPP_PAUSA_LOTE_MS: int = 30000
+    # Checa connectionState a cada N envios (1 = sempre; 0 = só no início).
+    WHATSAPP_CHECK_CONEXAO_A_CADA: int = 10
+    # Simulação de "digitando" no payload da Evolution (por mensagem).
+    WHATSAPP_PRESENCE_DELAY_MS: int = 1500
     # Origens CORS explícitas, separadas por vírgula. CORS_ALLOWED_ORIGINS tem prioridade.
     CORS_ALLOWED_ORIGINS: str = ""
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"

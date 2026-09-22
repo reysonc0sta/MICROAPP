@@ -3,7 +3,13 @@ from sqlalchemy.orm import Session
 import pandas as pd
 
 from app.services.telefones import candidatos_envio, obter_telefone_envio
-from app.services.whatsapp_service import enviar_lembrete
+from app.services.whatsapp_service import (
+    aguardar_entre_envios,
+    carregar_imagem_base64,
+    deve_checar_conexao,
+    enviar_lembrete,
+    whatsapp_esta_conectado,
+)
 from app.services.historico_service import registrar_envio_whatsapp
 from app.services.disparo_jobs import deve_parar, finalizar_job
 from app.services.config_service import (
@@ -144,6 +150,14 @@ def processar_lembretes_excel(
     total_sucesso = 0
     total_falha = 0
     cancelado = False
+    desconectado = False
+    processados = 0
+
+    media_base64 = None
+    if caminho_imagem:
+        media_base64 = carregar_imagem_base64(caminho_imagem)
+        if not media_base64:
+            raise ValueError("Não foi possível ler a imagem anexada ao lembrete.")
 
     try:
         for candidato in candidatos:
@@ -153,6 +167,13 @@ def processar_lembretes_excel(
 
             if not candidato["valido"]:
                 continue
+
+            if deve_checar_conexao(processados) and not whatsapp_esta_conectado(instance_name):
+                desconectado = True
+                break
+
+            if processados > 0:
+                aguardar_entre_envios(processados)
 
             canais = candidato.get("canais") or candidatos_envio(
                 candidato.get("tel_aluno"), candidato.get("tel_resp")
@@ -170,6 +191,7 @@ def processar_lembretes_excel(
                     caminho_imagem=caminho_imagem,
                     mimetype=imagem_mimetype,
                     file_name=imagem_nome,
+                    media_base64=media_base64,
                 ):
                     enviado = True
                     canal_usado = canal["canal"]
@@ -180,11 +202,16 @@ def processar_lembretes_excel(
                 numero_usado = canal["numero"]
                 usou_fallback = canal["usou_fallback"]
 
+            processados += 1
             status = "SUCESSO" if enviado else "FALHA_AMBOS"
             if enviado:
                 total_sucesso += 1
             else:
                 total_falha += 1
+                # Falha em sequência pode indicar sessão caída — confirma antes de seguir.
+                if not whatsapp_esta_conectado(instance_name):
+                    desconectado = True
+                    # Ainda registra este resultado abaixo, depois encerra.
 
             texto_historico = candidato["mensagem"]
             if caminho_imagem:
@@ -210,8 +237,14 @@ def processar_lembretes_excel(
                 "com_imagem": bool(caminho_imagem),
                 "horario_envio": datetime.now(),
             })
+
+            if desconectado:
+                break
     finally:
-        finalizar_job(job_id, cancelado=cancelado)
+        if desconectado:
+            finalizar_job(job_id, status="DESCONECTADO")
+        else:
+            finalizar_job(job_id, cancelado=cancelado)
 
     return {
         "turno": validar_turno(turno),
@@ -220,5 +253,6 @@ def processar_lembretes_excel(
         "total_falha": total_falha,
         "com_imagem": bool(caminho_imagem),
         "cancelado": cancelado,
+        "desconectado": desconectado,
         "detalhes": resultados_envio,
     }
