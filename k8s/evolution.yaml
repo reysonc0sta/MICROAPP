@@ -1,0 +1,121 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: evolution-instances
+  namespace: microapp
+  labels:
+    app.kubernetes.io/name: microapp
+    app.kubernetes.io/component: evolution
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: evolution
+  namespace: microapp
+  labels:
+    app.kubernetes.io/name: microapp
+    app.kubernetes.io/component: evolution
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: evolution
+  template:
+    metadata:
+      labels:
+        app: evolution
+        app.kubernetes.io/name: microapp
+        app.kubernetes.io/component: evolution
+    spec:
+      containers:
+        - name: evolution
+          image: evoapicloud/evolution-api:v2.3.7
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SERVER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: microapp-config
+                  key: SERVER_URL
+            - name: AUTHENTICATION_TYPE
+              value: apikey
+            - name: AUTHENTICATION_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: microapp-secrets
+                  key: EVOLUTION_API_KEY
+            - name: DATABASE_ENABLED
+              value: "true"
+            - name: DATABASE_PROVIDER
+              value: postgresql
+            - name: DATABASE_CONNECTION_URI
+              valueFrom:
+                secretKeyRef:
+                  name: microapp-secrets
+                  key: DATABASE_CONNECTION_URI
+            - name: DATABASE_CONNECTION_CLIENT_NAME
+              value: microapp_evolution
+            - name: DATABASE_SAVE_DATA_INSTANCE
+              value: "true"
+            - name: CACHE_REDIS_ENABLED
+              value: "false"
+            - name: CACHE_LOCAL_ENABLED
+              value: "true"
+            - name: CONFIG_SESSION_PHONE_CLIENT
+              value: Chrome
+            - name: CONFIG_SESSION_PHONE_NAME
+              value: Chrome
+            - name: QRCODE_LIMIT
+              value: "30"
+            - name: LANGUAGE
+              valueFrom:
+                configMapKeyRef:
+                  name: microapp-config
+                  key: LANGUAGE
+          volumeMounts:
+            - name: instances
+              mountPath: /evolution/instances
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+      volumes:
+        - name: instances
+          persistentVolumeClaim:
+            claimName: evolution-instances
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: evolution
+  namespace: microapp
+  labels:
+    app.kubernetes.io/name: microapp
+    app.kubernetes.io/component: evolution
+spec:
+  type: NodePort
+  selector:
+    app: evolution
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30808

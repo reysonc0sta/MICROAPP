@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 .env
 .env.*
+!.env.example
+!**/.env.example
 venv/
 
 # Node / React
@@ -12,6 +14,9 @@ dist/
 
 # Banco de dados local
 *.sqlite3
+
+# Kubernetes secrets reais (use secret.yaml.example)
+k8s/secret.yaml
 
 # IDEs
 .vscode/

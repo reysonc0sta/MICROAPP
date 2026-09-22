@@ -3,6 +3,8 @@ import axios from 'axios';
 /** Usa o mesmo host da página (localhost ou IP da rede) para a API funcionar na LAN. */
 function resolveApiBaseUrl() {
   const fromEnv = import.meta.env.VITE_API_URL;
+  // Produção (Nginx/K8s): caminho relativo — o proxy encaminha /api ao backend.
+  if (fromEnv && fromEnv.startsWith('/')) return fromEnv;
   const host = window.location.hostname;
   const isLocalHost = host === 'localhost' || host === '127.0.0.1';
   if (fromEnv && isLocalHost) return fromEnv;

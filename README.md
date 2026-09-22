@@ -21,29 +21,42 @@ MICROAPP/
 ├── frontend/         # SPA React + Vite
 ├── docker/           # scripts de init do Postgres
 ├── docker-compose.yml
-└── .env              # variáveis de ambiente (não versionado)
+├── .env.example      # template portátil (versionado)
+└── .env              # variáveis locais (não versionado)
 ```
 
 ## Pré-requisitos
 
 - Docker e Docker Compose
-- Arquivo `.env` na raiz (nunca versionado)
+- Arquivo `.env` na raiz (nunca versionado; copie a partir de `.env.example`)
 
-## Setup
+## Setup (igual em qualquer PC)
 
 1. Clone o repositório e entre na pasta do projeto.
 
-2. Preencha o `.env` na raiz. Variáveis obrigatórias para o Compose:
+2. Crie o `.env` a partir do template (uma vez por máquina):
+
+```bash
+# Windows (PowerShell / cmd)
+copy .env.example .env
+
+# Linux / macOS
+cp .env.example .env
+```
+
+Edite só senhas, `SECRET_KEY` e `EVOLUTION_API_KEY`. **Não coloque IP da LAN em `CORS_*`** — mantenha `CORS_ALLOW_LAN=true`. O frontend monta a URL da API pelo host da página; o `docker-compose.yml` não precisa ser alterado por máquina.
+
+Variáveis obrigatórias para o Compose:
 
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
 - `SECRET_KEY` (JWT)
 - `EVOLUTION_API_KEY`
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD`
-- `CORS_ALLOWED_ORIGINS` (origens explícitas do frontend; não use `*`)
-- `CORS_ALLOW_LAN` (acesso pelo IP da rede local)
-- `VITE_API_URL` (ex.: `http://localhost:8000/api/v1`)
+- `CORS_ALLOWED_ORIGINS` (só `localhost` / `127.0.0.1`; não use `*`)
+- `CORS_ALLOW_LAN=true` (acesso pelo IP da rede local)
+- `VITE_API_URL=http://localhost:8000/api/v1`
 
-Há também `.env` em `backend/` e `frontend/` se rodar serviços fora do Docker.
+Para rodar o backend fora do Docker, use também `backend/.env.example` → `backend/.env`.
 
 3. Suba a stack:
 
@@ -59,6 +72,8 @@ Serviços:
 | API | http://localhost:8000 (`/docs` para Swagger) |
 | Evolution API | http://localhost:8080 |
 | Postgres | apenas em `127.0.0.1:5432` (não exposto na LAN) |
+
+Acesso na rede local: abra `http://<IP-do-PC>:5173`. A API e o CORS acompanham automaticamente.
 
 4. Seed do admin (se ainda não existir):
 
@@ -84,6 +99,10 @@ docker compose logs -f backend
 # testes do backend
 docker compose run --no-deps --rm backend python -m pytest -q
 ```
+
+## CI/CD local (Jenkins + kind)
+
+Para build, testes e deploy em Kubernetes local, veja [docs/ci-cd-local.md](docs/ci-cd-local.md). O Compose permanece o fluxo de desenvolvimento diário.
 
 ## Licença
 
