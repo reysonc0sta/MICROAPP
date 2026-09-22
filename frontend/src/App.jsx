@@ -97,6 +97,7 @@ export default function App() {
           <DispararLembretes
             whatsappConectado={whatsappConectado}
             onIrParaConexao={() => irPara('conectar')}
+            cargoUsuario={usuario.cargo}
           />
         ) : null}
         {abaAtiva === 'modulos' ? <AcompanhamentoModulos /> : null}

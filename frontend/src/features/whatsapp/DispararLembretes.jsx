@@ -16,6 +16,8 @@ import {
   Send,
   X,
   MessageSquareText,
+  ImagePlus,
+  Ban,
 } from 'lucide-react';
 import { statusWhatsappConectado } from './statusWhatsapp';
 
@@ -25,6 +27,9 @@ const TURNOS = [
   { valor: 'NOITE', label: 'Noite', Icon: Moon },
   { valor: 'TODOS', label: 'Todos', Icon: Layers },
 ];
+
+const LIMITE_IMAGEM_MB = 5;
+const TIPOS_IMAGEM = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 function StatusBadge({ valido, motivo }) {
   if (valido) {
@@ -44,17 +49,21 @@ function StatusBadge({ valido, motivo }) {
   );
 }
 
-export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
+export function DispararLembretes({ whatsappConectado, onIrParaConexao, cargoUsuario }) {
+  const podeSalvarSemWhatsapp = ['ADM', 'DIRETOR'].includes(String(cargoUsuario || '').toUpperCase());
   const [turno, setTurno] = useState('MANHA');
   const [arquivo, setArquivo] = useState(null);
   const [preview, setPreview] = useState(null);
   const [template, setTemplate] = useState('');
+  const [imagem, setImagem] = useState(null);
+  const [previewImagem, setPreviewImagem] = useState('');
   const [carregandoPreview, setCarregandoPreview] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState('');
   const [salvandoMsg, setSalvandoMsg] = useState(false);
   const [msgSalva, setMsgSalva] = useState('');
+  const [cancelando, setCancelando] = useState(false);
   const [inputKey, setInputKey] = useState(0);
   const [arrastando, setArrastando] = useState(false);
 
@@ -72,11 +81,26 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
     carregar();
   }, []);
 
+  useEffect(() => {
+    if (!imagem) {
+      setPreviewImagem('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(imagem);
+    setPreviewImagem(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imagem]);
+
   const limparEstadoArquivo = () => {
     setArquivo(null);
     setPreview(null);
     setResultado(null);
     setInputKey((k) => k + 1);
+  };
+
+  const limparImagem = () => {
+    setImagem(null);
+    setPreviewImagem('');
   };
 
   const carregarPreview = async (file, turnoSelecionado = turno) => {
@@ -121,8 +145,29 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
     carregarPreview(file, turno);
   };
 
+  const aceitarImagem = (file) => {
+    if (!file) return;
+    const tipoOk = TIPOS_IMAGEM.includes(file.type) || /\.(jpe?g|png|webp|gif)$/i.test(file.name);
+    if (!tipoOk) {
+      setErro('Envie apenas imagens JPG, PNG, WEBP ou GIF.');
+      return;
+    }
+    if (file.size > LIMITE_IMAGEM_MB * 1024 * 1024) {
+      setErro(`A imagem deve ter no máximo ${LIMITE_IMAGEM_MB} MB.`);
+      return;
+    }
+    setImagem(file);
+    setErro('');
+    setMsgSalva('');
+  };
+
   const handleFileChange = (e) => {
     aceitarArquivo(e.target.files?.[0]);
+    e.target.value = '';
+  };
+
+  const handleImagemChange = (e) => {
+    aceitarImagem(e.target.files?.[0]);
     e.target.value = '';
   };
 
@@ -142,6 +187,17 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
   };
 
   const handleSalvarMensagem = async () => {
+    // Salvar template não exige WhatsApp — ADM/DIRETOR (e demais cargos com permissão na API) podem gravar offline.
+    if (!template.includes('{nome}')) {
+      setErro('A mensagem precisa incluir a variável {nome}.');
+      return;
+    }
+
+    if (!whatsappConectado && !podeSalvarSemWhatsapp) {
+      setErro('Conecte o WhatsApp para salvar a mensagem, ou peça a um ADM.');
+      return;
+    }
+
     setSalvandoMsg(true);
     setErro('');
     setMsgSalva('');
@@ -149,13 +205,37 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
       const { data } = await api.put('/configuracoes/mensagem-lembrete', { template });
       setTemplate(data.template);
       setMsgSalva('Mensagem salva com sucesso.');
-      if (arquivo) {
+      if (arquivo && whatsappConectado) {
         await carregarPreview(arquivo, turno);
       }
     } catch (err) {
       setErro(apiErrorMessage(err, 'Erro ao salvar a mensagem do lembrete.'));
     } finally {
       setSalvandoMsg(false);
+    }
+  };
+
+  const handleCancelarDisparo = async () => {
+    const jobId = resultado?.job_id;
+    if (!jobId) return;
+
+    setCancelando(true);
+    setErro('');
+    try {
+      const { data } = await api.post(`/whatsapp/cancelar-disparo/${jobId}`);
+      setResultado((atual) =>
+        atual
+          ? {
+              ...atual,
+              status: data.status,
+              mensagem: data.mensagem,
+            }
+          : atual
+      );
+    } catch (err) {
+      setErro(apiErrorMessage(err, 'Erro ao cancelar o disparo.'));
+    } finally {
+      setCancelando(false);
     }
   };
 
@@ -186,6 +266,9 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
       const formData = new FormData();
       formData.append('file', arquivo);
       formData.append('turno', turno);
+      if (imagem) {
+        formData.append('imagem', imagem);
+      }
 
       const response = await api.post('/whatsapp/disparar-lembretes', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -225,7 +308,15 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
           <WifiOff size={20} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
           <span>
-            <strong>WhatsApp desconectado.</strong> Conecte o aparelho pelo QR Code para liberar o envio.{' '}
+            <strong>WhatsApp desconectado.</strong>{' '}
+            {podeSalvarSemWhatsapp ? (
+              <>
+                Você ainda pode editar e <strong>salvar a mensagem</strong> do lembrete. Para disparar,
+                conecte o aparelho pelo QR Code.{' '}
+              </>
+            ) : (
+              <>Conecte o aparelho pelo QR Code para liberar o envio e o salvamento da mensagem. </>
+            )}
             {onIrParaConexao ? (
               <button type="button" onClick={onIrParaConexao} className="font-semibold underline">
                 Ir para Conectar WhatsApp
@@ -257,31 +348,110 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
         </div>
       </div>
 
-      <div className="card space-y-3">
-        <div className="flex items-center gap-2">
-          <MessageSquareText size={18} className="text-navy-600 dark:text-navy-300" />
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">Mensagem do lembrete</h3>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="card space-y-3">
+          <div className="flex items-center gap-2">
+            <MessageSquareText size={18} className="text-navy-600 dark:text-navy-300" />
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">Mensagem do lembrete</h3>
+          </div>
+          <textarea
+            value={template}
+            onChange={(e) => setTemplate(e.target.value)}
+            rows={5}
+            className="field resize-y font-mono text-sm"
+            placeholder="Olá, {nome}! Não haverá aula no turno da {turno}..."
+          />
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span>Placeholders:</span>
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono dark:bg-slate-800">{'{nome}'}</code>
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono dark:bg-slate-800">{'{turno}'}</code>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSalvarMensagem}
+              disabled={
+                salvandoMsg ||
+                !template.includes('{nome}') ||
+                (!whatsappConectado && !podeSalvarSemWhatsapp)
+              }
+              className="btn-secondary sm:w-auto"
+              title={
+                !whatsappConectado && !podeSalvarSemWhatsapp
+                  ? 'Conecte o WhatsApp para salvar a mensagem'
+                  : 'Salvar texto do lembrete (não exige disparo)'
+              }
+            >
+              {salvandoMsg ? (
+                <>
+                  <Loader2 className="animate-spin" size={16} />
+                  Salvando...
+                </>
+              ) : (
+                'Salvar mensagem'
+              )}
+            </button>
+            {msgSalva ? <span className="text-sm text-emerald-600 dark:text-emerald-400">{msgSalva}</span> : null}
+            {podeSalvarSemWhatsapp && !whatsappConectado ? (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                ADM pode salvar sem WhatsApp conectado
+              </span>
+            ) : null}
+          </div>
         </div>
-        <textarea
-          value={template}
-          onChange={(e) => setTemplate(e.target.value)}
-          rows={4}
-          className="field resize-y font-mono text-sm"
-          placeholder="Olá, {nome}! Não haverá aula no turno da {turno}..."
-        />
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <span>Placeholders:</span>
-          <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono dark:bg-slate-800">{'{nome}'}</code>
-          <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono dark:bg-slate-800">{'{turno}'}</code>
-          <button
-            type="button"
-            onClick={handleSalvarMensagem}
-            disabled={salvandoMsg || !template.includes('{nome}')}
-            className="ml-auto text-navy-700 underline disabled:opacity-40 dark:text-navy-200"
-          >
-            {salvandoMsg ? 'Salvando...' : 'Salvar mensagem'}
-          </button>
-          {msgSalva ? <span className="text-emerald-600 dark:text-emerald-400">{msgSalva}</span> : null}
+
+        <div className="card space-y-3">
+          <div className="flex items-center gap-2">
+            <ImagePlus size={18} className="text-navy-600 dark:text-navy-300" />
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">Imagem anexada</h3>
+            <span className="text-xs font-normal text-slate-500 dark:text-slate-400">(opcional)</span>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            A imagem será enviada junto com o texto como legenda no WhatsApp. JPG, PNG, WEBP ou GIF até{' '}
+            {LIMITE_IMAGEM_MB} MB.
+          </p>
+
+          {previewImagem ? (
+            <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950">
+              <img
+                src={previewImagem}
+                alt="Pré-visualização da imagem do lembrete"
+                className="max-h-56 w-full object-contain"
+              />
+              <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-3 py-2 dark:border-slate-700">
+                <span className="truncate text-xs text-slate-600 dark:text-slate-300">{imagem?.name}</span>
+                <button
+                  type="button"
+                  onClick={limparImagem}
+                  disabled={carregando}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline disabled:opacity-40 dark:text-red-400"
+                >
+                  <X size={12} />
+                  Remover
+                </button>
+              </div>
+            </div>
+          ) : (
+            <label
+              className={`relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition ${
+                carregando
+                  ? 'cursor-not-allowed opacity-50'
+                  : 'border-slate-300 hover:border-navy-400 hover:bg-slate-50 dark:border-slate-700 dark:hover:border-navy-500 dark:hover:bg-slate-900'
+              }`}
+            >
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+                onChange={handleImagemChange}
+                disabled={carregando}
+                className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed"
+              />
+              <ImagePlus size={28} className="mb-2 text-navy-600 dark:text-navy-300" />
+              <span className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                Clique para escolher uma imagem
+              </span>
+            </label>
+          )}
         </div>
       </div>
 
@@ -344,6 +514,12 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
               <CheckCircle size={12} />
               {preview.total_validos} receberão mensagem
             </span>
+            {imagem ? (
+              <span className="badge border-sky-200 bg-sky-50 text-sky-800 shadow-sm dark:border-sky-800/60 dark:bg-sky-950/40 dark:text-sky-200">
+                <ImagePlus size={12} />
+                Com imagem
+              </span>
+            ) : null}
             {preview.total_invalidos > 0 ? (
               <span className="badge border-red-200 bg-red-50 text-red-700 shadow-sm dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
                 <PhoneOff size={12} />
@@ -387,15 +563,39 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
       ) : null}
 
       {resultado ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-          <div className="mb-1 flex items-center gap-2 font-bold">
-            <CheckCircle size={18} className="text-emerald-600" />
+        <div
+          className={`rounded-2xl border p-4 text-sm ${
+            resultado.status === 'CANCELADO'
+              ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+          }`}
+        >
+          <div className="mb-1 flex flex-wrap items-center gap-2 font-bold">
+            {resultado.status === 'CANCELADO' ? (
+              <Ban size={18} className="text-amber-600" />
+            ) : (
+              <CheckCircle size={18} className="text-emerald-600" />
+            )}
             <span>{resultado.mensagem}</span>
           </div>
-          <p className="text-xs text-emerald-700 dark:text-emerald-400">
+          <p
+            className={`text-xs ${
+              resultado.status === 'CANCELADO'
+                ? 'text-amber-800 dark:text-amber-300'
+                : 'text-emerald-700 dark:text-emerald-400'
+            }`}
+          >
             Arquivo: <strong>{resultado.nome_arquivo}</strong>
+            {resultado.com_imagem ? (
+              <>
+                {' '}
+                | <strong>com imagem</strong>
+              </>
+            ) : null}
             {resultado.status === 'PROCESSANDO' ? (
               <> | Status: <strong>em segundo plano</strong></>
+            ) : resultado.status === 'CANCELADO' ? (
+              <> | Status: <strong>cancelado</strong></>
             ) : (
               <>
                 {' '}
@@ -403,6 +603,17 @@ export function DispararLembretes({ whatsappConectado, onIrParaConexao }) {
               </>
             )}
           </p>
+          {resultado.status === 'PROCESSANDO' && resultado.job_id ? (
+            <button
+              type="button"
+              onClick={handleCancelarDisparo}
+              disabled={cancelando}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-900"
+            >
+              {cancelando ? <Loader2 className="animate-spin" size={16} /> : <Ban size={16} />}
+              {cancelando ? 'Cancelando...' : 'Cancelar envios'}
+            </button>
+          ) : null}
         </div>
       ) : null}
 

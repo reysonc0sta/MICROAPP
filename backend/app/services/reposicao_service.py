@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.services.telefones import candidatos_envio, obter_telefone_envio
 from app.services.whatsapp_service import disparar_mensagem_real
 from app.services.historico_service import registrar_envio_whatsapp
+from app.services.disparo_jobs import deve_parar, finalizar_job
 from app.services.config_service import (
     TEMPLATE_PADRAO,
     obter_template_mensagem,
@@ -95,6 +96,7 @@ def processar_disparos_faltas_excel(
     caminho_arquivo: str,
     db: Session,
     instance_name: str,
+    job_id: str | None = None,
 ) -> dict:
     """
     Lê a planilha, envia alertas com fallback pessoal→comercial e grava histórico.
@@ -104,59 +106,68 @@ def processar_disparos_faltas_excel(
     resultados_envio = []
     total_sucesso = 0
     total_falha = 0
+    cancelado = False
 
-    for candidato in candidatos:
-        if not candidato["valido"]:
-            continue
+    try:
+        for candidato in candidatos:
+            if deve_parar(job_id):
+                cancelado = True
+                break
 
-        canais = candidato.get("canais") or candidatos_envio(
-            candidato.get("tel_aluno"), candidato.get("tel_resp")
-        )
-        enviado = False
-        canal_usado = None
-        numero_usado = None
-        usou_fallback = False
+            if not candidato["valido"]:
+                continue
 
-        for canal in canais:
-            if disparar_mensagem_real(canal["numero"], candidato["mensagem"], instance_name):
-                enviado = True
+            canais = candidato.get("canais") or candidatos_envio(
+                candidato.get("tel_aluno"), candidato.get("tel_resp")
+            )
+            enviado = False
+            canal_usado = None
+            numero_usado = None
+            usou_fallback = False
+
+            for canal in canais:
+                if disparar_mensagem_real(canal["numero"], candidato["mensagem"], instance_name):
+                    enviado = True
+                    canal_usado = canal["canal"]
+                    numero_usado = canal["numero"]
+                    usou_fallback = canal["usou_fallback"]
+                    break
                 canal_usado = canal["canal"]
                 numero_usado = canal["numero"]
                 usou_fallback = canal["usou_fallback"]
-                break
-            canal_usado = canal["canal"]
-            numero_usado = canal["numero"]
-            usou_fallback = canal["usou_fallback"]
 
-        status = "SUCESSO" if enviado else "FALHA_AMBOS"
-        if enviado:
-            total_sucesso += 1
-        else:
-            total_falha += 1
+            status = "SUCESSO" if enviado else "FALHA_AMBOS"
+            if enviado:
+                total_sucesso += 1
+            else:
+                total_falha += 1
 
-        registrar_envio_whatsapp(
-            db,
-            numero=numero_usado or "",
-            canal=canal_usado or "PESSOAL",
-            usou_fallback=usou_fallback,
-            texto=candidato["mensagem"],
-            status_final=status,
-            nome_destino=candidato["nome"],
-        )
+            registrar_envio_whatsapp(
+                db,
+                numero=numero_usado or "",
+                canal=canal_usado or "PESSOAL",
+                usou_fallback=usou_fallback,
+                texto=candidato["mensagem"],
+                status_final=status,
+                nome_destino=candidato["nome"],
+            )
 
-        resultados_envio.append({
-            "nome": candidato["nome"],
-            "numero": numero_usado,
-            "canal": canal_usado,
-            "usou_fallback": usou_fallback,
-            "status": status,
-            "respondido": False,
-            "horario_envio": datetime.now(),
-        })
+            resultados_envio.append({
+                "nome": candidato["nome"],
+                "numero": numero_usado,
+                "canal": canal_usado,
+                "usou_fallback": usou_fallback,
+                "status": status,
+                "respondido": False,
+                "horario_envio": datetime.now(),
+            })
+    finally:
+        finalizar_job(job_id, cancelado=cancelado)
 
     return {
         "total_disparados": len(resultados_envio),
         "total_sucesso": total_sucesso,
         "total_falha": total_falha,
+        "cancelado": cancelado,
         "detalhes": resultados_envio,
     }

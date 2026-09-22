@@ -13,6 +13,7 @@ from app.core.validacao_arquivo import calcular_sha256, validar_magic_number_xls
 from app.models.domain import Aluno, Materia, ProvaResultado, Usuario
 from app.services.auditoria import registrar_log
 from app.services.config_service import obter_template_lembrete, obter_template_mensagem
+from app.services.disparo_jobs import cancelar_job, criar_job, obter_job
 from app.services.historico_service import registrar_envio_whatsapp
 from app.services.lembrete_service import (
     TURNOS_VALIDOS,
@@ -38,6 +39,15 @@ router = APIRouter()
 whatsapp_ops_deps = Depends(require_cargos("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"))
 
 EXTENSOES_PLANILHA = {".xls", ".xlsx"}
+EXTENSOES_IMAGEM = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+MIME_IMAGEM = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+}
+LIMITE_IMAGEM_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 class EnviarDiretoBody(BaseModel):
@@ -51,6 +61,21 @@ def _validar_planilha(file: UploadFile) -> str:
     sufixo = Path(file.filename).suffix.lower()
     if sufixo not in EXTENSOES_PLANILHA:
         raise HTTPException(status_code=400, detail="Envie um arquivo Excel válido (.xls ou .xlsx).")
+    return sufixo
+
+
+def _validar_imagem(file: UploadFile) -> str:
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Envie uma imagem válida.")
+    sufixo = Path(file.filename).suffix.lower()
+    if sufixo not in EXTENSOES_IMAGEM:
+        raise HTTPException(
+            status_code=400,
+            detail="Envie apenas imagens JPG, PNG, WEBP ou GIF.",
+        )
+    content_type = (file.content_type or "").lower()
+    if content_type and not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="O arquivo de mídia precisa ser uma imagem.")
     return sufixo
 
 
@@ -79,24 +104,80 @@ async def _salvar_upload_seguro(file: UploadFile) -> str:
     return path
 
 
-def _job_disparar_faltas(caminho: str, instance_name: str) -> None:
+async def _salvar_imagem_segura(file: UploadFile) -> tuple[str, str, str]:
+    """Salva imagem temporária e devolve (caminho, mimetype, nome_arquivo)."""
+    sufixo = _validar_imagem(file)
+    fd, path = tempfile.mkstemp(prefix="microapp_img_", suffix=sufixo)
+    os.close(fd)
+    total = 0
+    try:
+        with open(path, "wb") as buffer:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > LIMITE_IMAGEM_BYTES:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="A imagem deve ter no máximo 5 MB.",
+                    )
+                buffer.write(chunk)
+    except HTTPException:
+        if os.path.exists(path):
+            os.remove(path)
+        raise
+    except Exception:
+        if os.path.exists(path):
+            os.remove(path)
+        raise
+
+    if total == 0:
+        os.remove(path)
+        raise HTTPException(status_code=400, detail="A imagem enviada está vazia.")
+
+    mimetype = MIME_IMAGEM.get(sufixo, "image/jpeg")
+    nome = Path(file.filename).name
+    return path, mimetype, nome
+
+
+def _job_disparar_faltas(caminho: str, instance_name: str, job_id: str | None = None) -> None:
     db = SessionLocal()
     try:
-        processar_disparos_faltas_excel(caminho, db, instance_name)
+        processar_disparos_faltas_excel(caminho, db, instance_name, job_id=job_id)
     finally:
         db.close()
         if os.path.exists(caminho):
             os.remove(caminho)
 
 
-def _job_disparar_lembretes(caminho: str, turno: str, instance_name: str) -> None:
+def _job_disparar_lembretes(
+    caminho: str,
+    turno: str,
+    instance_name: str,
+    caminho_imagem: str | None = None,
+    imagem_mimetype: str | None = None,
+    imagem_nome: str | None = None,
+    job_id: str | None = None,
+) -> None:
     db = SessionLocal()
     try:
-        processar_lembretes_excel(caminho, db, turno, instance_name)
+        processar_lembretes_excel(
+            caminho,
+            db,
+            turno,
+            instance_name,
+            caminho_imagem=caminho_imagem,
+            imagem_mimetype=imagem_mimetype,
+            imagem_nome=imagem_nome,
+            job_id=job_id,
+        )
     finally:
         db.close()
         if os.path.exists(caminho):
             os.remove(caminho)
+        if caminho_imagem and os.path.exists(caminho_imagem):
+            os.remove(caminho_imagem)
 
 
 @router.get("/status")
@@ -274,6 +355,7 @@ async def disparar_lembretes(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     turno: str = Form("TODOS"),
+    imagem: UploadFile | None = File(None),
     usuario: Usuario = whatsapp_ops_deps,
     db: Session = Depends(get_db),
 ):
@@ -285,8 +367,29 @@ async def disparar_lembretes(
         raise HTTPException(status_code=400, detail="Turno inválido. Use MANHA, TARDE, NOITE ou TODOS.")
 
     temp_path = await _salvar_upload_seguro(file)
+    caminho_imagem = None
+    imagem_mimetype = None
+    imagem_nome = None
+    try:
+        if imagem is not None and imagem.filename:
+            caminho_imagem, imagem_mimetype, imagem_nome = await _salvar_imagem_segura(imagem)
+    except Exception:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise
+
     hash_arquivo = calcular_sha256(temp_path)
-    background_tasks.add_task(_job_disparar_lembretes, temp_path, turno_norm, instance_name)
+    job_id = criar_job(usuario.id, "lembretes")
+    background_tasks.add_task(
+        _job_disparar_lembretes,
+        temp_path,
+        turno_norm,
+        instance_name,
+        caminho_imagem,
+        imagem_mimetype,
+        imagem_nome,
+        job_id,
+    )
     registrar_log(
         db,
         usuario=usuario,
@@ -294,7 +397,14 @@ async def disparar_lembretes(
         entidade="whatsapp",
         entidade_id=None,
         descricao=f'Disparou lembretes do turno {turno_norm} com a planilha "{file.filename}"',
-        valor_novo={"nome_arquivo": file.filename, "turno": turno_norm, "sha256": hash_arquivo},
+        valor_novo={
+            "nome_arquivo": file.filename,
+            "turno": turno_norm,
+            "sha256": hash_arquivo,
+            "com_imagem": bool(caminho_imagem),
+            "imagem": imagem_nome,
+            "job_id": job_id,
+        },
     )
 
     return {
@@ -302,6 +412,8 @@ async def disparar_lembretes(
         "status": "PROCESSANDO",
         "nome_arquivo": file.filename,
         "turno": turno_norm,
+        "com_imagem": bool(caminho_imagem),
+        "job_id": job_id,
         "instanceName": instance_name,
     }
 
@@ -317,7 +429,8 @@ async def upload_planilha(
     exigir_whatsapp_conectado(instance_name)
     temp_path = await _salvar_upload_seguro(file)
     hash_arquivo = calcular_sha256(temp_path)
-    background_tasks.add_task(_job_disparar_faltas, temp_path, instance_name)
+    job_id = criar_job(usuario.id, "faltas")
+    background_tasks.add_task(_job_disparar_faltas, temp_path, instance_name, job_id)
     registrar_log(
         db,
         usuario=usuario,
@@ -325,11 +438,57 @@ async def upload_planilha(
         entidade="whatsapp",
         entidade_id=None,
         descricao=f'Disparou mensagens de falta com a planilha "{file.filename}"',
-        valor_novo={"nome_arquivo": file.filename, "sha256": hash_arquivo},
+        valor_novo={"nome_arquivo": file.filename, "sha256": hash_arquivo, "job_id": job_id},
     )
     return {
         "mensagem": "Disparo de reposição iniciado em segundo plano. O histórico será gravado no banco.",
         "status": "PROCESSANDO",
         "nome_arquivo": file.filename,
+        "job_id": job_id,
         "instanceName": instance_name,
+    }
+
+
+@router.post("/cancelar-disparo/{job_id}")
+def cancelar_disparo(
+    job_id: str,
+    usuario: Usuario = whatsapp_ops_deps,
+):
+    """Solicita o cancelamento de um disparo em andamento (para no próximo aluno)."""
+    try:
+        job = cancelar_job(job_id, usuario.id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Disparo não encontrado ou já finalizado.") from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Sem permissão para cancelar este disparo.") from exc
+
+    if job.status == "CONCLUIDO":
+        return {
+            "job_id": job.id,
+            "status": job.status,
+            "mensagem": "O disparo já havia sido concluído.",
+        }
+
+    return {
+        "job_id": job.id,
+        "status": job.status,
+        "mensagem": "Cancelamento solicitado. Os envios param após a mensagem em andamento.",
+    }
+
+
+@router.get("/status-disparo/{job_id}")
+def status_disparo(
+    job_id: str,
+    usuario: Usuario = whatsapp_ops_deps,
+):
+    job = obter_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Disparo não encontrado.")
+    if job.usuario_id != int(usuario.id):
+        raise HTTPException(status_code=403, detail="Sem permissão para consultar este disparo.")
+    return {
+        "job_id": job.id,
+        "tipo": job.tipo,
+        "status": job.status,
+        "cancelado": job.cancelado,
     }

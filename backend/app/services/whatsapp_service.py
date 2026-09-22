@@ -360,3 +360,70 @@ def disparar_mensagem_real(numero: str, texto: str, instance_name: str) -> bool:
     except Exception as exc:
         print(f"[ERRO EVOLUTION] Erro inesperado ao enviar para {numero}: {exc}")
         return False
+
+
+def disparar_imagem_real(
+    numero: str,
+    caminho_imagem: str,
+    caption: str,
+    instance_name: str,
+    mimetype: str = "image/jpeg",
+    file_name: str = "imagem.jpg",
+) -> bool:
+    """Envia imagem com legenda via Evolution API (POST /message/sendMedia/{instance})."""
+    try:
+        with open(caminho_imagem, "rb") as fh:
+            encoded = base64.b64encode(fh.read()).decode("ascii")
+    except OSError as exc:
+        print(f"[ERRO EVOLUTION] Não foi possível ler a imagem {caminho_imagem}: {exc}")
+        return False
+
+    media = f"data:{mimetype};base64,{encoded}"
+    url = f"{EVOLUTION_URL}/message/sendMedia/{instance_name}"
+    payload = {
+        "number": numero,
+        "mediatype": "image",
+        "mimetype": mimetype,
+        "caption": caption or "",
+        "media": media,
+        "fileName": file_name,
+        "delay": 1200,
+    }
+    try:
+        response = requests.post(
+            url,
+            json=payload,
+            headers=_headers(),
+            timeout=60,
+        )
+        return response.status_code in (200, 201)
+    except requests.Timeout as exc:
+        print(f"[ERRO EVOLUTION] Timeout ao enviar imagem para {numero}: {exc}")
+        return False
+    except requests.RequestException as exc:
+        print(f"[ERRO EVOLUTION] Falha ao enviar imagem para {numero}: {exc}")
+        return False
+    except Exception as exc:
+        print(f"[ERRO EVOLUTION] Erro inesperado ao enviar imagem para {numero}: {exc}")
+        return False
+
+
+def enviar_lembrete(
+    numero: str,
+    texto: str,
+    instance_name: str,
+    caminho_imagem: str | None = None,
+    mimetype: str | None = None,
+    file_name: str | None = None,
+) -> bool:
+    """Envia lembrete: imagem+legenda se houver mídia; senão só texto."""
+    if caminho_imagem:
+        return disparar_imagem_real(
+            numero,
+            caminho_imagem,
+            texto,
+            instance_name,
+            mimetype=mimetype or "image/jpeg",
+            file_name=file_name or "lembrete.jpg",
+        )
+    return disparar_mensagem_real(numero, texto, instance_name)

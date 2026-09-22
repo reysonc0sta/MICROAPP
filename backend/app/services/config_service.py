@@ -60,16 +60,18 @@ def atualizar_template_lembrete(db: Session, novo_template: str) -> Configuracao
 
 def renderizar_mensagem(template: str, nome: str, faltas: int) -> str:
     primeiro_nome = nome.split()[0].title()
-    try:
-        return template.format(nome=primeiro_nome, faltas=faltas)
-    except (KeyError, IndexError):
-        # Placeholder inválido no template salvo: cai para o padrão em vez de quebrar o disparo.
-        return TEMPLATE_PADRAO.format(nome=primeiro_nome, faltas=faltas)
+    # replace evita quebrar com chaves literais no texto (ex.: {código})
+    return (
+        (template or TEMPLATE_PADRAO)
+        .replace("{nome}", primeiro_nome)
+        .replace("{faltas}", str(faltas))
+    )
 
 
 def renderizar_mensagem_lembrete(template: str, nome: str, turno: str) -> str:
     primeiro_nome = nome.split()[0].title()
-    try:
-        return template.format(nome=primeiro_nome, turno=turno)
-    except (KeyError, IndexError):
-        return TEMPLATE_LEMBRETE_PADRAO.format(nome=primeiro_nome, turno=turno)
+    return (
+        (template or TEMPLATE_LEMBRETE_PADRAO)
+        .replace("{nome}", primeiro_nome)
+        .replace("{turno}", str(turno))
+    )

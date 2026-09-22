@@ -16,6 +16,7 @@ import {
   MessageSquareText,
   Phone,
   MoreVertical,
+  Ban,
 } from 'lucide-react';
 import { statusWhatsappConectado } from './statusWhatsapp';
 
@@ -166,6 +167,7 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
   const [template, setTemplate] = useState('');
   const [salvandoMsg, setSalvandoMsg] = useState(false);
   const [msgSalva, setMsgSalva] = useState('');
+  const [cancelando, setCancelando] = useState(false);
   const [alunoSelecionado, setAlunoSelecionado] = useState(null);
 
   useEffect(() => {
@@ -269,6 +271,30 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
       setErro(apiErrorMessage(err, 'Erro ao salvar a mensagem.'));
     } finally {
       setSalvandoMsg(false);
+    }
+  };
+
+  const handleCancelarDisparo = async () => {
+    const jobId = resultado?.job_id;
+    if (!jobId) return;
+
+    setCancelando(true);
+    setErro('');
+    try {
+      const { data } = await api.post(`/whatsapp/cancelar-disparo/${jobId}`);
+      setResultado((atual) =>
+        atual
+          ? {
+              ...atual,
+              status: data.status,
+              mensagem: data.mensagem,
+            }
+          : atual
+      );
+    } catch (err) {
+      setErro(apiErrorMessage(err, 'Erro ao cancelar o disparo.'));
+    } finally {
+      setCancelando(false);
     }
   };
 
@@ -437,15 +463,24 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
                 Inclua {'{nome}'} para disparar
               </span>
             ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={handleSalvarMensagem}
               disabled={salvandoMsg || !temNome || acimaLimite}
-              className="ml-auto text-navy-700 underline disabled:opacity-40 dark:text-navy-200"
+              className="btn-secondary sm:w-auto"
             >
-              {salvandoMsg ? 'Salvando...' : 'Salvar mensagem'}
+              {salvandoMsg ? (
+                <>
+                  <Loader2 className="animate-spin" size={16} />
+                  Salvando...
+                </>
+              ) : (
+                'Salvar mensagem'
+              )}
             </button>
-            {msgSalva ? <span className="text-emerald-600 dark:text-emerald-400">{msgSalva}</span> : null}
+            {msgSalva ? <span className="text-sm text-emerald-600 dark:text-emerald-400">{msgSalva}</span> : null}
           </div>
         </div>
 
@@ -593,18 +628,36 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
       ) : null}
 
       {resultado ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-          <div className="mb-1 flex items-center gap-2 font-bold">
-            <CheckCircle size={18} className="text-emerald-600" />
+        <div
+          className={`rounded-2xl border p-4 text-sm ${
+            resultado.status === 'CANCELADO'
+              ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+          }`}
+        >
+          <div className="mb-1 flex flex-wrap items-center gap-2 font-bold">
+            {resultado.status === 'CANCELADO' ? (
+              <Ban size={18} className="text-amber-600" />
+            ) : (
+              <CheckCircle size={18} className="text-emerald-600" />
+            )}
             <span>{resultado.mensagem}</span>
           </div>
-          <p className="text-xs text-emerald-700 dark:text-emerald-400">
+          <p
+            className={`text-xs ${
+              resultado.status === 'CANCELADO'
+                ? 'text-amber-800 dark:text-amber-300'
+                : 'text-emerald-700 dark:text-emerald-400'
+            }`}
+          >
             Arquivo: <strong>{resultado.nome_arquivo}</strong>
             {resultado.status === 'PROCESSANDO' ? (
               <>
                 {' '}
                 | Status: <strong>em segundo plano</strong> (histórico gravado no banco)
               </>
+            ) : resultado.status === 'CANCELADO' ? (
+              <> | Status: <strong>cancelado</strong></>
             ) : (
               <>
                 {' '}
@@ -612,6 +665,17 @@ export function ImportarPlanilha({ whatsappConectado, onIrParaConexao }) {
               </>
             )}
           </p>
+          {resultado.status === 'PROCESSANDO' && resultado.job_id ? (
+            <button
+              type="button"
+              onClick={handleCancelarDisparo}
+              disabled={cancelando}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-900"
+            >
+              {cancelando ? <Loader2 className="animate-spin" size={16} /> : <Ban size={16} />}
+              {cancelando ? 'Cancelando...' : 'Cancelar envios'}
+            </button>
+          ) : null}
         </div>
       ) : null}
 

@@ -63,7 +63,7 @@ def obter_mensagem(
 def atualizar_mensagem(
     dados: TemplateMensagemIn,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(require_cargos("ADM", "DIRETOR", "ASSISTENTE")),
+    usuario: Usuario = Depends(require_cargos("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE")),
 ):
     if "{nome}" not in dados.template:
         raise HTTPException(
@@ -76,7 +76,7 @@ def atualizar_mensagem(
     except Exception:
         raise HTTPException(
             status_code=400,
-            detail="Template inválido. Use apenas os placeholders {nome} e {faltas}.",
+            detail="Template inválido. Use os placeholders {nome} e {faltas}.",
         )
 
     anterior = obter_configuracao(db).template
@@ -107,7 +107,7 @@ def obter_mensagem_lembrete(
 def atualizar_mensagem_lembrete(
     dados: TemplateMensagemIn,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(require_cargos("ADM", "DIRETOR", "ASSISTENTE")),
+    usuario: Usuario = Depends(require_cargos("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE")),
 ):
     if "{nome}" not in dados.template:
         raise HTTPException(
@@ -120,7 +120,7 @@ def atualizar_mensagem_lembrete(
     except Exception:
         raise HTTPException(
             status_code=400,
-            detail="Template inválido. Use apenas os placeholders {nome} e {turno}.",
+            detail="Template inválido. Use os placeholders {nome} e {turno}.",
         )
 
     anterior = obter_configuracao(db).template_lembrete or ""
