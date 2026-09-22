@@ -37,6 +37,10 @@ NOMES_FERIADOS_FIXOS = {
     (12, 25): "Natal",
 }
 
+FERIADOS_REGIONAIS_FIXOS = {
+    (9, 5): "Feriado regional",
+}
+
 ROTULOS_GRUPO = {
     "seg_qua": "Seg/Qua",
     "ter_qui": "Ter/Qui",
@@ -85,6 +89,19 @@ def feriados_federais(ano: int) -> list[tuple[date, str]]:
     ]
     sexta = _sexta_feira_santa(ano)
     itens.append((sexta, "Sexta-feira Santa"))
+    itens.sort(key=lambda item: item[0])
+    return itens
+
+
+def feriados_regionais(ano: int) -> list[tuple[date, str]]:
+    """Dias em que a unidade não opera, além dos nacionais."""
+    return [
+        (date(ano, mes, dia), nome) for (mes, dia), nome in FERIADOS_REGIONAIS_FIXOS.items()
+    ]
+
+
+def feriados_sem_aula(ano: int) -> list[tuple[date, str]]:
+    itens = feriados_federais(ano) + feriados_regionais(ano)
     itens.sort(key=lambda item: item[0])
     return itens
 
@@ -149,7 +166,7 @@ def calcular_relatorio_pacotes(
     dia_atual = agora.day
     dias_totais_mes = calendar.monthrange(ano, mes)[1]
 
-    feriados_ano = feriados_federais(ano)
+    feriados_ano = feriados_sem_aula(ano)
     feriados_mes = [(d, nome) for d, nome in feriados_ano if d.month == mes]
     feriados_set = {d for d, _ in feriados_mes}
 

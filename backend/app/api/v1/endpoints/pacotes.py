@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -13,6 +14,7 @@ from app.models.domain import Usuario
 from app.schemas.schemas import RelatorioPacotesOut
 from app.services.auditoria import registrar_log
 from app.services.pacotes_calculo import processar_planilha_pacotes
+from app.services.pacotes_pdf import gerar_pdf_pacotes
 
 router = APIRouter()
 pacotes_deps = Depends(require_cargos("ADM", "DIRETOR", "PROFESSOR", "ASSISTENTE"))
@@ -81,3 +83,19 @@ async def upload_planilha_pacotes(
         valor_novo={"nome_arquivo": file.filename, "sha256": hash_arquivo},
     )
     return relatorio
+
+
+@router.post("/exportar-pdf")
+async def exportar_pdf_pacotes(
+    dados: RelatorioPacotesOut,
+    _: Usuario = pacotes_deps,
+):
+    """Gera o PDF a partir do JSON já calculado. Não relê planilha e não persiste."""
+    pdf = await asyncio.to_thread(gerar_pdf_pacotes, dados.model_dump())
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'attachment; filename="relatorio-gestao-pacotes.pdf"',
+        },
+    )

@@ -3,6 +3,7 @@ import {
   AlertCircle,
   AlertTriangle,
   CalendarDays,
+  FileDown,
   Loader2,
   Package,
   Upload,
@@ -45,6 +46,19 @@ function rotuloStatus(aluno) {
 
 function celulaOuTraco(valor) {
   return valor === null || valor === undefined || valor === '' ? '—' : valor;
+}
+
+async function mensagemErroBlob(err, fallback) {
+  const data = err?.response?.data;
+  if (data instanceof Blob) {
+    try {
+      const parsed = JSON.parse(await data.text());
+      if (typeof parsed?.detail === 'string') return parsed.detail;
+    } catch {
+      /* resposta não era JSON */
+    }
+  }
+  return apiErrorMessage(err, fallback);
 }
 
 function TabelaAlunos({ alunos }) {
@@ -105,6 +119,7 @@ export function GestaoPacotes() {
   const [arquivo, setArquivo] = useState(null);
   const [relatorio, setRelatorio] = useState(null);
   const [carregandoUpload, setCarregandoUpload] = useState(false);
+  const [carregandoPdf, setCarregandoPdf] = useState(false);
   const [erro, setErro] = useState('');
   const [inputKey, setInputKey] = useState(0);
   const [arrastando, setArrastando] = useState(false);
@@ -152,11 +167,34 @@ export function GestaoPacotes() {
   const handleDrop = (e) => {
     e.preventDefault();
     setArrastando(false);
-    if (carregandoUpload) return;
+    if (carregandoUpload || carregandoPdf) return;
     processarArquivo(e.dataTransfer.files?.[0]);
   };
 
-  const dropzoneAtiva = !carregandoUpload;
+  const exportarPdf = async () => {
+    if (!relatorio) return;
+    setCarregandoPdf(true);
+    setErro('');
+    try {
+      const { data } = await api.post('/pacotes/exportar-pdf', relatorio, {
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'relatorio-gestao-pacotes.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setErro(await mensagemErroBlob(err, 'Erro ao gerar o PDF.'));
+    } finally {
+      setCarregandoPdf(false);
+    }
+  };
+
+  const dropzoneAtiva = !carregandoUpload && !carregandoPdf;
   const feriados = relatorio?.feriados_aplicados || [];
   const avisos = relatorio?.avisos || [];
   const naoAgrupados = relatorio?.nao_agrupados || [];
@@ -238,25 +276,36 @@ export function GestaoPacotes() {
                 {String(relatorio.mes).padStart(2, '0')}/{relatorio.ano} · previsto até hoje = floor
                 (previsto no mês × {relatorio.dia_atual}/{relatorio.dias_totais_mes})
               </p>
-              <div className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-                <CalendarDays size={16} className="mt-0.5 shrink-0 text-navy-600 dark:text-navy-300" />
-                <div>
-                  <p className="font-medium text-slate-800 dark:text-slate-100">
-                    Feriados federais neste mês
-                  </p>
-                  {feriados.length ? (
-                    <ul className="mt-1 space-y-0.5 text-slate-500 dark:text-slate-400">
-                      {feriados.map((feriado) => (
-                        <li key={feriado.data}>
-                          {formatarDataIso(feriado.data)} — {feriado.nome}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="mt-1 text-slate-500 dark:text-slate-400">
-                      Nenhum feriado nacional neste mês.
+              <div className="flex flex-wrap items-start gap-3">
+                <button
+                  type="button"
+                  onClick={exportarPdf}
+                  disabled={carregandoPdf}
+                  className="btn-primary sm:w-auto"
+                >
+                  {carregandoPdf ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+                  {carregandoPdf ? 'Gerando PDF...' : 'Exportar PDF'}
+                </button>
+                <div className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+                  <CalendarDays size={16} className="mt-0.5 shrink-0 text-navy-600 dark:text-navy-300" />
+                  <div>
+                    <p className="font-medium text-slate-800 dark:text-slate-100">
+                      Feriados neste mês (sem aula)
                     </p>
-                  )}
+                    {feriados.length ? (
+                      <ul className="mt-1 space-y-0.5 text-slate-500 dark:text-slate-400">
+                        {feriados.map((feriado) => (
+                          <li key={feriado.data}>
+                            {formatarDataIso(feriado.data)} — {feriado.nome}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-1 text-slate-500 dark:text-slate-400">
+                        Nenhum feriado neste mês.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
